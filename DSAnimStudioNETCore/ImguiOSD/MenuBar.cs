@@ -525,6 +525,7 @@ namespace DSAnimStudio.ImguiOSD
             //bool clicked_Tools_AnimationImporter = false;
             bool clicked_Tools_ManageTaeSections = false;
             bool clicked_Tools_ManageAnimationFiles = false;
+            bool clicked_Tools_UnrealEngine = false;
 
             if (ImGui.BeginMenu("Tools"))
             {
@@ -561,6 +562,11 @@ namespace DSAnimStudio.ImguiOSD
 
                 //if (ClickItem("Open Animation Importer"))
                 //    clicked_Tools_AnimationImporter = true;
+
+                ImGui.Separator();
+
+                if(ClickItem("Export To Unreal Engine...", enabled: Tae?.IsFileOpen == true && !LoadingTaskMan.AnyTasksRunning()))
+                    clicked_Tools_UnrealEngine = true;
 
                 ImGui.Separator();
 
@@ -737,6 +743,13 @@ namespace DSAnimStudio.ImguiOSD
             //{
             //    Tae.BringUpImporter_FBXAnim();
             //}
+            else if(clicked_Tools_UnrealEngine)
+            {
+                Main.MainThreadLazyDispatch(() =>
+                {
+                    Tae.ShowExportUnrealEngineDialog();
+                });
+            }
         }
 
         private static float FloatSlider(string name, float currentValue, float min, float max, string format = "%f", float power = 1)

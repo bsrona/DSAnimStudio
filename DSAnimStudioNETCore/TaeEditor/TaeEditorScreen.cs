@@ -363,6 +363,27 @@ namespace DSAnimStudio.TaeEditor
             }
         }
 
+        public void ShowExportUnrealEngineDialog()
+        {
+			GameWindowAsForm.Invoke(new Action(() =>
+            {
+                if(!IsFileOpen)
+                    return;
+
+                if(ExportUnrealEngineDiag == null || ExportUnrealEngineDiag.IsDisposed)
+                {
+                    ExportUnrealEngineDiag = new TaeExportUnrealEngineForm();
+                    ExportUnrealEngineDiag.Owner = GameWindowAsForm;
+                    ExportUnrealEngineDiag.MainScreen = this;
+                    ExportUnrealEngineDiag.ShownInitValues();
+                }
+
+                ExportUnrealEngineDiag.Show();
+                Main.CenterForm(ExportUnrealEngineDiag);
+                ExportUnrealEngineDiag.Activate();
+            }));
+        }
+
         public void ShowComboMenu()
         {
             GameWindowAsForm.Invoke(new Action(() =>
@@ -387,6 +408,7 @@ namespace DSAnimStudio.TaeEditor
 
         public TaeComboMenu ComboMenu = null;
         public TaeExportAllAnimsForm ExportAllAnimsMenu = null;
+        public TaeExportUnrealEngineForm ExportUnrealEngineDiag = null;
 
         public float AnimSwitchRenderCooldown = 0;
         public float AnimSwitchRenderCooldownMax = 0.3f;

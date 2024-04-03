@@ -1055,7 +1055,8 @@ namespace DSAnimStudio
                 ImGuiDraw = new ImGuiRenderer(this);
                 //ImGuiDraw.RebuildFontAtlas();
 
-                
+                if (DBG.EnableMenu)
+                    DbgMenuItem.Init();
 
                 base.Initialize();
             }

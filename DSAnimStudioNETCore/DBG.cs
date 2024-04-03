@@ -169,9 +169,9 @@ namespace DSAnimStudio
 
         private static object _lock_primitives = new object();
 
-        public static bool EnableMenu = false;
+        public static bool EnableMenu = true;
 
-        public static bool EnableKeyboardInput = false;
+        public static bool EnableKeyboardInput = true;
         public static bool EnableMouseInput = true;
         public static bool EnableGamePadInput = false;
 
@@ -265,7 +265,7 @@ namespace DSAnimStudio
             if (GFX.CurrentWorldView.ShowGrid)
             {
                 DbgPrim_Grid_XZ.Draw(null, Matrix.Identity);
-                //DbgPrim_Grid_XY.Draw(null, Matrix.Identity);
+                DbgPrim_Grid_XY.Draw(null, Matrix.Identity);
             }
         }
 

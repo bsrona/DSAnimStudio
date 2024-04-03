@@ -236,7 +236,8 @@ namespace DSAnimStudio
 
                 foreach (var mdl in mdls)
                 {
-                    mdl.Draw();
+                    int lod = (GFX.LODMode == LODMode.Automatic) ? 0 : (int) GFX.LODMode;
+                    mdl.Draw(lod);
                     if (!CheckIfDrawing())
                         return;
                 }

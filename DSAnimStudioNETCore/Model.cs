@@ -88,6 +88,8 @@ namespace DSAnimStudio
         public Dictionary<int, List<string>> NpcMaterialNamesPerMask = new Dictionary<int, List<string>>();
         public List<int> NpcMasksEnabledOnAllNpcParams = new List<int>();
 
+        public FLVER2 flver;
+
         private int _selectedNpcParamIndex = -1;
         public int SelectedNpcParamIndex
         {
@@ -429,6 +431,7 @@ namespace DSAnimStudio
                     return;
 
                 LoadFLVER2(flver2, useSecondUV: false, baseDmyPolyID, ignoreStaticTransforms);
+                flver = flver2;
             }
 
            
