@@ -33,7 +33,7 @@ namespace DSAnimStudio.TaeEditor
 
         public TaeFileContainerType ContainerType { get; private set; }
 
-        private IBinder containerANIBND;
+        public IBinder containerANIBND;
         private IBinder containerANIBND_2010;
         private bool containerANIBND_2010_IsModified = false;
 

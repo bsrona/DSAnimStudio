@@ -11,6 +11,8 @@ namespace DSAnimStudio
 {
     public class FlverMaterialDefInfo
     {
+        public MTD mtd;
+
         public string Name;
         public string ShaderName;
 
@@ -389,7 +391,7 @@ namespace DSAnimStudio
                 {
                     var EldenRingShaderbdle = LoadBinder($@"/shader/shaderbdle.shaderbdlebnd.dcx");
 
-                    var matchingFile = EldenRingShaderbdle.Files.FirstOrDefault(x => Utils.GetShortIngameFileName(x.Name) == shaderName);
+                    var matchingFile = EldenRingShaderbdle.Files.FirstOrDefault(x => Utils.GetShortIngameFileName(x.Name).ToLower() == shaderName.ToLower());
                     if (matchingFile != null)
                     {
                         var innerShaderbdle = BND4.Read(matchingFile.Bytes);
@@ -510,12 +512,63 @@ namespace DSAnimStudio
                 }
                 //return result;
             }
-            else// if (game == SoulsGames.DS1 || game == SoulsGames.DS1R || game == SoulsGames.BB || game == SoulsGames.DS3 || game == SoulsGames.SDT || game == SoulsGames.DES)
+            else if (game == SoulsGames.SDT)
+            {
+				var mtd = MTD.Read(bytes);
+				result = new FlverMaterialDefInfo();
+				result.Name = name;
+				result.mtd = mtd;
+				result.ShaderName = Utils.GetShortIngameFileName(mtd.ShaderPath);
+
+				var metaparam = LoadMetaParam(result.ShaderName);
+
+				foreach(var tx in mtd.Textures)
+				{
+					var uvScaleX = 1f;
+					var uvScaleY = 1f;
+					if(tx.UnkFloats.Count == 2)
+					{
+						if(tx.UnkFloats[0] != 0)
+							uvScaleX = tx.UnkFloats[0];
+						if(tx.UnkFloats[1] != 0)
+							uvScaleY = tx.UnkFloats[1];
+					}
+
+                    var metaparamEntry = metaparam?.SamplerInfos?.FirstOrDefault(x => x.Name == tx.Type);
+					result.SamplerConfigs.Add(tx.Type, new SamplerConfig()
+					{
+						Name = tx.Type,
+						TexPath = tx.Path,
+                        DefaultTexPath = metaparamEntry?.DefaultTexturePath,
+						UVScale = new Vector2(uvScaleX, uvScaleY),
+					});
+
+                    if (string.IsNullOrEmpty(metaparamEntry?.DefaultTexturePath))
+                    {
+                        int fuck = 0;
+                        fuck++;
+                        metaparam = LoadMetaParam(result.ShaderName);
+                    }
+				}
+
+				foreach(var p in mtd.Params)
+				{
+					if(!result.ShaderParameters.ContainsKey(p.Name))
+						result.ShaderParameters.Add(p.Name, p.Value);
+					else
+						result.ShaderParameters[p.Name] = p.Value;
+
+					if(!result.ShaderParameters_AreUsedByDSAS.ContainsKey(p.Name))
+						result.ShaderParameters_AreUsedByDSAS.Add(p.Name, false);
+				}
+			}
+			else// if (game == SoulsGames.DS1 || game == SoulsGames.DS1R || game == SoulsGames.BB || game == SoulsGames.DS3 || game == SoulsGames.SDT || game == SoulsGames.DES)
             {
                 var mtd = MTD.Read(bytes);
                 result = new FlverMaterialDefInfo();
                 result.Name = name;
-                result.ShaderName = Utils.GetShortIngameFileName(mtd.ShaderPath);
+				result.mtd = mtd;
+				result.ShaderName = Utils.GetShortIngameFileName(mtd.ShaderPath);
                 foreach (var tx in mtd.Textures)
                 {
                     var uvScaleX = 1f;

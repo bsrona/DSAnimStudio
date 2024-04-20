@@ -19,8 +19,13 @@ namespace DSAnimStudio.TaeEditor
 
         private List<ToolExportUnrealEngine.ExportFileType> fileTypeSelEntriesMapping = new List<ToolExportUnrealEngine.ExportFileType>
         {
+            ToolExportUnrealEngine.ExportFileType.All,
             ToolExportUnrealEngine.ExportFileType.SkeletalMesh_Fbx,
+            ToolExportUnrealEngine.ExportFileType.AnimationSkeleton_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequence_Fbx,
+            ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx,
+            ToolExportUnrealEngine.ExportFileType.Textures,
+            ToolExportUnrealEngine.ExportFileType.Materials_Json,
         };
 
         private bool IS_BUSY = false;
@@ -271,7 +276,7 @@ namespace DSAnimStudio.TaeEditor
                     int progMax = animNames.Count + (isExportSkeleton ? 1 : 0); // All anims + skeleton
 
 					//byte[] exportedSkeletonBytes = exporter.ExportSkeleton(animContainer.Skeleton.SkeletonPackfile, exportAsFileType, out bool userRequestCancelSkeleton);
-					bool result = exporter.Export(exportAsFileType, path, null, out bool userRequestCancelSkeleton);
+					exporter.Export(exportAsFileType, path, null, out bool userRequestCancelSkeleton);
 
 					var skelHkxForAnims = animContainer.Skeleton.SkeletonPackfile;
 
@@ -354,24 +359,11 @@ namespace DSAnimStudio.TaeEditor
 
         private void buttonBrowse_Click(object sender, EventArgs e)
         {
-            var currentDirectory = textBoxDestinationFolder.Text;
-            try
-            {
-                currentDirectory = System.IO.Path.GetFullPath(currentDirectory);
-            }
-            catch
-            {
-                currentDirectory = null;
-            }
+            string path = ShowModelDialog();
 
-            var saveFileDialog = new System.Windows.Forms.SaveFileDialog();
-
-            if (currentDirectory != null)
-                saveFileDialog.InitialDirectory = currentDirectory;
-
-            if (saveFileDialog.ShowDialog() == DialogResult.OK)
+            if (path != null)
             {
-                textBoxDestinationFolder.Text = saveFileDialog.FileName;
+                textBoxDestinationFolder.Text = path;
                 textBoxDestinationFolder.Select(textBoxDestinationFolder.Text.Length, 0);
                 textBoxDestinationFolder.ScrollToCaret();
             }
@@ -491,6 +483,47 @@ namespace DSAnimStudio.TaeEditor
 			}
 
 			return !directoryFailed;
+		}
+
+        string ShowModelDialog()
+        {
+			var currentDirectory = textBoxDestinationFolder.Text;
+			try
+			{
+				currentDirectory = System.IO.Path.GetFullPath(currentDirectory);
+			}
+			catch
+			{
+				currentDirectory = null;
+			}
+
+			var exportAsFileType = fileTypeSelEntriesMapping[listBoxExportAsFileType.SelectedIndex];
+            if ( exportAsFileType == ToolExportUnrealEngine.ExportFileType.All
+                || exportAsFileType == ToolExportUnrealEngine.ExportFileType.SkeletalMesh_Fbx
+				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx
+				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.Textures
+				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.Materials_Json)
+			{
+				var selectFolderDiag = new FolderBrowserDialog();
+
+				if (currentDirectory != null)
+					selectFolderDiag.InitialDirectory = currentDirectory;
+
+    			if (selectFolderDiag.ShowDialog() == DialogResult.OK)
+                    return selectFolderDiag.SelectedPath;
+            }
+            else
+            {
+				var saveFileDialog = new SaveFileDialog();
+
+				if (currentDirectory != null)
+					saveFileDialog.InitialDirectory = currentDirectory;
+
+				if (saveFileDialog.ShowDialog() == DialogResult.OK)
+					return saveFileDialog.FileName;
+			}
+
+			return null;
 		}
 	}
 }

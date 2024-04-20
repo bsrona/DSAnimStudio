@@ -865,10 +865,12 @@ namespace DSAnimStudio
             if (GameRoot.GameType != SoulsAssetPipeline.SoulsGames.DES && flver2 != null)
             {
                 mesh = new NewMesh(flver2, false, boneIndexRemap);
+                mesh.binder = partsbnd;
             }
             else if (GameRoot.GameType == SoulsAssetPipeline.SoulsGames.DES && flver0 != null)
             {
                 mesh = new NewMesh(flver0, false, boneIndexRemap);
+                mesh.binder = partsbnd;
             }
             Scene.RequestTextureLoad();
 

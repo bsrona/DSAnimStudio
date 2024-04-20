@@ -41,6 +41,8 @@ namespace DSAnimStudio
 
         public bool TextureReloadQueued = false;
 
+        public IBinder binder;
+        public FLVER2 flver;
         public FLVER2.FLVERHeader Flver2Header = null;
 
         public void TryLoadGlobalShaderConfigs()
@@ -102,6 +104,7 @@ namespace DSAnimStudio
         private void LoadFLVER2(FLVER2 flver, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
             bool ignoreStaticTransforms = false)
         {
+            this.flver = flver;
             Flver2Header = flver.Header;
 
 

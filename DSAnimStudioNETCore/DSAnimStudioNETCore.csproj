@@ -57,6 +57,9 @@
     <Reference Include="ImGui.NET">
       <HintPath>..\Lib\ImGui.NET.dll</HintPath>
     </Reference>
+	<Reference Include="Pfim">
+		<HintPath>..\Lib\Pfim.dll</HintPath>
+	</Reference>
   </ItemGroup>
 
   <ItemGroup>

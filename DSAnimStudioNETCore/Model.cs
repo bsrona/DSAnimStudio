@@ -88,6 +88,7 @@ namespace DSAnimStudio
         public Dictionary<int, List<string>> NpcMaterialNamesPerMask = new Dictionary<int, List<string>>();
         public List<int> NpcMasksEnabledOnAllNpcParams = new List<int>();
 
+        public IBinder binder;
         public FLVER2 flver;
 
         private int _selectedNpcParamIndex = -1;
@@ -296,6 +297,7 @@ namespace DSAnimStudio
             AnimContainer = new NewAnimationContainer();
 
             Name = name;
+            binder = chrbnd; 
             List<BinderFile> flverFileEntries = new List<BinderFile>();
 
             if (tpfsUsed == null)

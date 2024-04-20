@@ -42,6 +42,8 @@ namespace DSAnimStudio
 
         public bool ForceDisableAnimLayerSystem = true;
 
+        public IBinder baseANIBND;
+        public List<IBinder> additionalANIBNDs = new List<IBinder>();
         
         public class AnimHkxInfo
         {
@@ -110,6 +112,19 @@ namespace DSAnimStudio
             }
 
             return selectedAnim;
+        }
+
+        public string GetAnimationPath(string name)
+        {
+            for (int i = 0; i < additionalANIBNDs.Count; ++i)
+            {
+                IBinder anibnd = additionalANIBNDs[i];
+                BinderFile file = anibnd.Files.Find(e => e.Name.ToLower().Contains(name));
+                if (file != null)
+                    return file.Name;
+            }
+
+            return null;
         }
 
         public bool IsAnimLoaded(string name)
@@ -1213,6 +1228,8 @@ namespace DSAnimStudio
             }
             else
             {
+                additionalANIBNDs.Add(anibnd);
+
                 Dictionary<string, byte[]> animHKXs = new Dictionary<string, byte[]>();
                 Dictionary<string, byte[]> taes = new Dictionary<string, byte[]>();
 
@@ -1297,6 +1314,7 @@ namespace DSAnimStudio
 
         public void LoadBaseANIBND(IBinder anibnd, IProgress<double> progress)
         {
+            baseANIBND = anibnd;
             var hkxVariation = GameRoot.GetCurrentLegacyHKXType();
 
             if (hkxVariation == HKX.HKXVariation.Invalid)
