@@ -114,9 +114,9 @@ namespace DSAnimStudio
 
 			ExportSkeletalMeshs(path, flvers, binders);
 
-			ExportTextures(path, flvers);
-
 			ExportMaterials(path, flvers, binders);
+
+			ExportTextures(path, flvers);
 
 			ExportSkeletons(path);
 
@@ -150,7 +150,7 @@ namespace DSAnimStudio
             {
 				Assimp.Scene scene = CreateScene(flver, relativeToRoot);
 				//Assimp.Scene scene = CreateTestScene();
-				return context.ExportFile(scene, path, "fbxa");
+				return context.ExportFile(scene, path, ExportFormatID);
                 //var fbx = context.ExportFile(fbxPath, PostProcessSteps.CalculateTangentSpace | PostProcessSteps.GlobalScale | PostProcessSteps.OptimizeGraph);
                 //return ImportFromAssimpScene(fbx, settings);
             }
@@ -181,7 +181,7 @@ namespace DSAnimStudio
 			using(var context = new AssimpContext())
 			{
 				Assimp.Scene scene = CreateScene(animationContainer);
-				return context.ExportFile(scene, fullpath, "fbxa");
+				return context.ExportFile(scene, fullpath, ExportFormatID);
 			}
 		}
 
@@ -415,7 +415,7 @@ namespace DSAnimStudio
 			{
 				Assimp.Scene scene = CreateScene(animContainer, name);
 				//Assimp.Scene scene = CreateTestScene();
-				return context.ExportFile(scene, path, "fbxa");
+				return context.ExportFile(scene, path, ExportFormatID);
 				//var fbx = context.ExportFile(fbxPath, PostProcessSteps.CalculateTangentSpace | PostProcessSteps.GlobalScale | PostProcessSteps.OptimizeGraph);
 				//return ImportFromAssimpScene(fbx, settings);
 			}
@@ -998,24 +998,43 @@ namespace DSAnimStudio
 				RootMotionData rootMotion = havokAnimationData.RootMotion;
 
 				List<VectorKey> positionKeys = track.PositionKeys;
+				List<QuaternionKey> rotationKeys = track.RotationKeys;
+				List<VectorKey> scaleKeys = track.ScalingKeys;
+
 				List<VectorKey> newPositionKeys = new List<VectorKey>(positionKeys.Count);
+				List<QuaternionKey> newRotationKeys = new List<QuaternionKey>(rotationKeys.Count);
+				List<VectorKey> newScaleKeys = new List<VectorKey>(scaleKeys.Count);
 
 				if (positionKeys.Count == rootMotion.Frames.Length)
 				{
 					for (int i = 0; i < positionKeys.Count; ++i)
 					{
 						Vector4 frame = rootMotion.Frames[i];
+
 						VectorKey positionKey = positionKeys[i];
+						QuaternionKey rotationKey = rotationKeys[i];
+						VectorKey scaleKey = scaleKeys[i];
 
-						VectorKey newPositionKey = new VectorKey();
+						System.Numerics.Matrix4x4 transform = System.Numerics.Matrix4x4.CreateScale(To(scaleKey.Value))
+							* System.Numerics.Matrix4x4.CreateFromQuaternion(To(rotationKey.Value))
+							* System.Numerics.Matrix4x4.CreateTranslation(To(positionKey.Value))
+							* System.Numerics.Matrix4x4.CreateRotationY(-Mirror.Y * frame.W)
+							* System.Numerics.Matrix4x4.CreateTranslation(new System.Numerics.Vector3(frame.X, frame.Y, frame.Z) * (To(UnitScale) * To(Mirror)));
 
-						newPositionKey.Time = positionKey.Time;
-						newPositionKey.Value = positionKey.Value + new Vector3D(frame.X, frame.Y, frame.Z) * (UnitScale * Mirror);
+						System.Numerics.Matrix4x4.Decompose(transform, out System.Numerics.Vector3 scale, out System.Numerics.Quaternion rotation, out System.Numerics.Vector3 translate);
+
+						VectorKey newPositionKey = new VectorKey(positionKey.Time, From(translate));
+						QuaternionKey newRotationKey = new QuaternionKey(rotationKey.Time, From(rotation));
+						VectorKey newScaleKey = new VectorKey(rotationKey.Time, From(scale));
 
 						newPositionKeys.Add(newPositionKey);
+						newRotationKeys.Add(newRotationKey);
+						newScaleKeys.Add(newScaleKey);
 					}
 
 					track.PositionKeys = newPositionKeys;
+					track.RotationKeys = newRotationKeys;
+					track.ScalingKeys = newScaleKeys;
 				}
 			}
 
@@ -1250,6 +1269,8 @@ namespace DSAnimStudio
 			binders?.Add(main.binder);
 
 			NewChrAsm charAsm = main.ChrAsm;
+			if (charAsm == null)
+				return flvers;
 
 			List<NewMesh> meshes = new List<NewMesh>()
 			{
@@ -1313,6 +1334,8 @@ namespace DSAnimStudio
 			animationContainers.Add(main.AnimContainer);
 
 			NewChrAsm charAsm = main.ChrAsm;
+			if (charAsm == null)
+				return animationContainers;
 
 			List<Model> models = new List<Model>()
 			{
@@ -1606,6 +1629,13 @@ namespace DSAnimStudio
 			return result;
 		}
 
+		System.Numerics.Quaternion To(Assimp.Quaternion q)
+		{
+			System.Numerics.Quaternion result = new System.Numerics.Quaternion(q.X, q.Y, q.Z, q.W);
+
+			return result;
+		}
+
 		Vector3D From(System.Numerics.Vector4 v)
 		{
 			Vector3D result = new Vector3D(v.X, v.Y, v.Z);
@@ -1726,5 +1756,7 @@ namespace DSAnimStudio
 
 			return relativeToRoot;
 		}
+
+		const string ExportFormatID = "fbxa";
 	}
 }

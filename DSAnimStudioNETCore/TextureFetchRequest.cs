@@ -129,12 +129,14 @@ namespace DSAnimStudio
                     if (TPFReference.Platform == TPF.TPFPlatform.PS3)
                         tex.Bytes = tex.Headerize();
 
-                    return new TextureInfo()
+                    TexInfo = new TextureInfo()
                     {
                         DDSBytes = tex.Bytes,
                         Platform = TPFReference.Platform,
                         Texture = tex,
                     };
+
+                    return TexInfo;
                 }
                 else
                 {
