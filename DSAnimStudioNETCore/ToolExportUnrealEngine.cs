@@ -25,6 +25,9 @@ using System.Drawing.Imaging;
 using Org.BouncyCastle.Utilities.Encoders;
 using DSAnimStudio.TaeEditor;
 using System.Reflection;
+using static DSAnimStudio.ToolExportUnrealEngine;
+using static SoulsAssetPipeline.Animation.TAE.EventGroup;
+using static SoulsAssetPipeline.Animation.TAE.Animation;
 
 namespace DSAnimStudio
 {
@@ -37,6 +40,7 @@ namespace DSAnimStudio
 			AnimationSkeleton_Fbx,
             AnimationSequence_Fbx,
 			AnimationSequences_Fbx,
+			Taes_Json,
 			Textures,
 			Materials_Json,
         }
@@ -53,6 +57,57 @@ namespace DSAnimStudio
 		public static readonly Vector3D UnitScale = new Vector3D(100, 100, 100); // Unit from FromSoftware Meter to UnrealEngine Centimeter and mirror
 		public static readonly Vector3D Mirror = new Vector3D(1, 1, -1);
 
+		public struct Part
+		{
+			public FLVER2 flver;
+			public string flverPath;
+			public NewAnimationContainer aniContainer;
+			public TaeFileContainer taeContainer;
+		}
+
+		public struct PartFile
+		{
+			public string Mesh;
+			public string Skeleton;
+			public List<string> Animations;
+			public List<string> Materials;
+		}
+
+		public struct Event
+		{
+			public float StartTime;
+			public float EndTime;
+			public int Type;
+			public IReadOnlyDictionary<string, object> Parameters;
+		}
+
+		public struct EventGroup
+		{
+			public long GroupType;
+			public EventGroupDataStruct GroupData;
+			public List<int> Events;
+		}
+
+		public struct Action
+		{
+			public long ID;
+			public List<Event> Events;
+			public List<EventGroup> EventGroups;
+			public AnimMiniHeader MiniHeader;
+			public string FileName;
+			public string Reference;
+			public string AnimationFile;
+		}
+
+		public struct Tae
+		{
+			public int ID;
+			public byte[] Flags;
+			public string SkeletonName;
+			public string SibName;
+			public List<Action> Actions;
+			public long EventBank;
+		}
 
 		public void Export(ExportFileType fileType, string path, string filename, out bool userRequestCancel)
         {
@@ -63,14 +118,11 @@ namespace DSAnimStudio
                 {
                     ExportAll(path);
                 }
-				else if(fileType == ExportFileType.SkeletalMesh_Fbx)
+				else if (fileType == ExportFileType.SkeletalMesh_Fbx)
 				{
-					List<IBinder> binders = new List<IBinder>();
-					List<FLVER2> flvers = GetAllFlvers(ref binders);
-
-					ExportSkeletalMeshs(path, flvers, binders);
+					ExportSkeletalMeshes(path);
 				}
-				else if(fileType == ExportFileType.AnimationSkeleton_Fbx)
+				else if (fileType == ExportFileType.AnimationSkeleton_Fbx)
 				{
 					ExportSkeletons(path);
 				}
@@ -79,23 +131,21 @@ namespace DSAnimStudio
 					NewAnimationContainer animContainer = Scene.MainModel.AnimContainer;
 					ExportAnimation(animContainer, animContainer.CurrentAnimationName, path);
 				}
-				else if(fileType == ExportFileType.AnimationSequences_Fbx)
+				else if (fileType == ExportFileType.AnimationSequences_Fbx)
 				{
 					ExportAnimations(path);
 				}
-				else if(fileType == ExportFileType.Textures)
+				else if (fileType == ExportFileType.Taes_Json)
 				{
-					List<IBinder> binders = null;
-					List<FLVER2> flvers = GetAllFlvers(ref binders);
-
-					ExportTextures(path, flvers);
+					ExportTaes(path);
 				}
-				else if(fileType == ExportFileType.Materials_Json)
+				else if (fileType == ExportFileType.Textures)
 				{
-					List<IBinder> binders = new List<IBinder>();
-					List<FLVER2> flvers = GetAllFlvers(ref binders);
-
-					ExportMaterials(path, flvers, binders);
+					ExportTextures(path);
+				}
+				else if (fileType == ExportFileType.Materials_Json)
+				{
+					ExportMaterials(path);
 				}
 			}
 			catch (Exception ex)
@@ -109,182 +159,323 @@ namespace DSAnimStudio
 
 		public void ExportAll(string path)
 		{
-			List<IBinder> binders = new List<IBinder>();
-			List<FLVER2> flvers = GetAllFlvers(ref binders);
+			List<Part> parts = GetParts();
 
-			ExportSkeletalMeshs(path, flvers, binders);
-
-			ExportMaterials(path, flvers, binders);
-
-			ExportTextures(path, flvers);
-
-			ExportSkeletons(path);
-
-			ExportAnimations(path);
-		}
-
-		public void ExportSkeletalMeshs(string path, List<FLVER2> flvers, List<IBinder> binders)
-		{
-			for (int i = 0; i < flvers.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
-				FLVER2 flver = flvers[i];
-				IBinder binder = binders[i];
+				Part part = parts[i];
 
-				string originPath = binder.Files.Find(e => e.Name.ToLower().Contains(".flver"))?.Name;
-				string relativePath = ToRelativePath(originPath);
-				relativePath = ReplacePaths(relativePath);
+				PartFile partFile = new PartFile();
 
-				string relativeToRoot = RelativeToRoot(relativePath);
+				ExportTextures(path, part);
 
-				string skeletalMeshPath = Path.ChangeExtension(path + relativePath, "fbx");
+				partFile.Materials = ExportMaterials(path, part);
+				partFile.Skeleton = ExportSkeleton(path, part);
+				partFile.Animations = ExportAnimations(path, part);
+				ExportTaes(path, part);
+				partFile.Mesh = ExportSkeletalMesh(path, part);
 
-				ExportSkeletalMesh(flver, skeletalMeshPath, relativeToRoot);
+				var json = Newtonsoft.Json.JsonConvert.SerializeObject(partFile, Newtonsoft.Json.Formatting.Indented);
+				string relativePath = Path.ChangeExtension(partFile.Mesh, "dsc");
+				WriteTextFile(json, path + relativePath);
 			}
 		}
 
-		public bool ExportSkeletalMesh(FLVER2 flver, string path, string relativeToRoot)
-        {
-			CreateDirectory(path);
-
-            using(var context = new AssimpContext())
-            {
-				Assimp.Scene scene = CreateScene(flver, relativeToRoot);
-				//Assimp.Scene scene = CreateTestScene();
-				return context.ExportFile(scene, path, ExportFormatID);
-                //var fbx = context.ExportFile(fbxPath, PostProcessSteps.CalculateTangentSpace | PostProcessSteps.GlobalScale | PostProcessSteps.OptimizeGraph);
-                //return ImportFromAssimpScene(fbx, settings);
-            }
-        }
-
-		public void ExportSkeletons(string path)
+		public void ExportSkeletalMeshes(string path)
 		{
-			List<NewAnimationContainer> animationContainers = GetAllAnimationContainer();
-			for (int i = 0; i < animationContainers.Count; ++i)
-			{
-				NewAnimationContainer animationContainer = animationContainers[i];
-				if (animationContainer.baseANIBND == null)
-					continue;
+			List<Part> parts = GetParts();
 
-				ExportSkeleton(animationContainer, path);
+			for (int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+
+				ExportSkeletalMesh(path, part);
 			}
 		}
 
-		public bool ExportSkeleton(NewAnimationContainer animationContainer, string path)
+		public void ExportTaes(string path)
 		{
-			IBinder anibnd = animationContainer.baseANIBND;
-			string originPath = anibnd.Files.Find(e => e.Name.ToLower().Contains("skeleton"))?.Name;
-			string relativePath = ToRelativePath(originPath);
-			relativePath = ReplacePaths(relativePath);
-			string fullpath = Path.ChangeExtension(path + relativePath, "fbx");
-			CreateDirectory(fullpath);
+			List<Part> parts = GetParts();
 
-			using(var context = new AssimpContext())
+			for(int i = 0; i < parts.Count; ++i)
 			{
-				Assimp.Scene scene = CreateScene(animationContainer);
-				return context.ExportFile(scene, fullpath, ExportFormatID);
+				Part part = parts[i];
+
+				ExportTaes(path, part);
 			}
 		}
 
 		public void ExportAnimations(string path)
 		{
-			List<NewAnimationContainer> animationContainers = GetAllAnimationContainer();
-			for (int i = 0; i < animationContainers.Count; ++i)
+			List<Part> parts = GetParts();
+
+			for (int i = 0; i < parts.Count; ++i)
 			{
-				List<IBinder> binders = new List<IBinder>();
+				Part part = parts[i];
 
-				NewAnimationContainer animationContainer = animationContainers[i];
-				binders.Add(animationContainer.baseANIBND);
-				binders.AddRange(animationContainer.additionalANIBNDs);
-
-				for (int j = 0; j < binders.Count; ++j)
-				{
-					IBinder binder = binders[j];
-					if (binder == null)
-						continue;
-	
-					for (int k = 0; k < binder.Files.Count; ++k)
-					{
-						BinderFile file = binder.Files[k];
-
-						string originalPath = file.Name;
-						string filename = Path.GetFileName(originalPath).ToLower();
-						if (filename[0] != 'a' || Path.GetExtension(filename) != ".hkx")
-							continue;
-
-						string relativePath = ToRelativePath(originalPath);
-						relativePath = ReplacePaths(relativePath);
-						string fullPath = Path.ChangeExtension(path + relativePath, "fbx");
-
-						try
-						{
-							ExportAnimation(animationContainer, filename, fullPath);
-						}
-						catch(Exception ex) 
-						{
-							ErrorLog.LogWarning($"Unable to export {fullPath}");
-						}
-					}
-				}
+				ExportAnimations(path, part);
 			}
 		}
 
-		public void ExportTAEs(string path)
+		public void ExportSkeletons(string path)
 		{
-			TaeFileContainer container = Main.TAE_EDITOR.FileContainer;
+			List<Part> parts = GetParts();
+
+			for(int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+
+				ExportSkeleton(path, part);
+			}
+		}
+
+		public void ExportMaterials(string path)
+		{
+			List<Part> parts = GetParts();
+
+			for (int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+				ExportMaterials(path, part);
+			}
+		}
+
+		public void ExportTextures(string path)
+		{
+			List<Part> parts = GetParts();
+
+			for (int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+				ExportTextures(path, part);
+			}
+		}
+
+		public string ExportSkeletalMesh(string path, Part part)
+        {
+			FLVER2 flver = part.flver;
+			string flverPath = part.flverPath;
+
+			string originPath = flverPath;
+
+			string relativePath = ToRelativePath(originPath);
+			relativePath = Path.ChangeExtension(relativePath, "fbx");
+
+			string relativeToRoot = RelativeToRoot(relativePath);
+
+			string fullPath = path + relativePath;
+
+			CreateDirectory(fullPath);
+
+            using(var context = new AssimpContext())
+            {
+				Assimp.Scene scene = CreateScene(flver, relativeToRoot);
+				if (context.ExportFile(scene, fullPath, ExportFormatID))
+					return relativePath;
+				else
+					return null;
+            }
+        }
+
+		public void ExportTaes(string path, Part part)
+		{
+			TaeFileContainer container = part.taeContainer;
+			if (container == null)
+				return;
+
 			IBinder binder = container.containerANIBND;
 			IReadOnlyDictionary<string, TAE> taes = container.AllTAEDict;
+			List<string> taeOriginalPath = taes.Keys.ToList();
 
-			NewAnimationContainer animationContainer = Scene.MainModel.AnimContainer;
+			NewAnimationContainer animationContainer = part.aniContainer;
 			var mainChrSolver = new TaeAnimRefChainSolver(taes, animationContainer.Animations);
 
-			foreach(var tae in taes.Values)
+			foreach (var taePair in taes)
 			{
-				List<TAE.Animation> animations = tae.Animations;
-				for(int i = 0; i < animations.Count; ++i)
+				string originalPath = taePair.Key;
+				string relativePath = ToRelativePath(originalPath);
+				string fullPath = path + relativePath;
+
+				List<Action> actions = new List<Action>();
+
+				TAE tae = taePair.Value;
+				List<TAE.Animation> taeAnimations = tae.Animations;
+
+				for (int i = 0; i < taeAnimations.Count; ++i)
 				{
-					TAE.Animation animation = animations[i];
-					string animationName = mainChrSolver.GetHKXName(tae, animation);
-					if(string.IsNullOrEmpty(animationName))
+					TAE.Animation taeAnimation = taeAnimations[i];
+
+					string reference = null;
+
+					if (taeAnimation.MiniHeader is TAE.Animation.AnimMiniHeader.ImportOtherAnim asImportOtherAnim)
+					{
+						if (mainChrSolver.GetCompositeAnimIDOfAnimInTAE(tae, taeAnimation) == asImportOtherAnim.ImportFromAnimID)
+						{
+							reference = relativePath;
+						}
+						else
+						{
+							var id = mainChrSolver.GetSplitAnimID(asImportOtherAnim.ImportFromAnimID);
+							string referenceOrignalPath = taeOriginalPath.Find(e => e.ToUpper().EndsWith($"{id.Upper:D2}.TAE"));
+							if (referenceOrignalPath != null)
+								reference = ToRelativePath(referenceOrignalPath);
+						}
+					}
+
+					string animationFile = null;
+
+					string animationName = mainChrSolver.GetHKXName(tae, taeAnimation);
+					if (!string.IsNullOrEmpty(animationName))
+					{
+						string aniOriginalPath = binder.Files.Find(e => e.Name.Contains(animationName))?.Name;
+						if (string.IsNullOrEmpty(aniOriginalPath))
+							aniOriginalPath = animationContainer.GetAnimationPath(animationName);
+						if (!string.IsNullOrEmpty(aniOriginalPath))
+						{
+							animationFile = ToRelativePath(aniOriginalPath);
+							animationFile = Path.ChangeExtension(animationFile, "fbx");
+						}
+					}
+
+					List<Event> events = new List<Event>();
+
+					List<TAE.Event> taeEvents = taeAnimation.Events;
+					for (int j = 0; j < taeEvents.Count; ++j)
+					{
+						TAE.Event taeEvent = taeEvents[j];
+
+						Event e = new Event();
+
+						e.StartTime = taeEvent.StartTime;
+						e.EndTime = taeEvent.EndTime;
+						e.Type = taeEvent.Type;
+						e.Parameters = taeEvent.Parameters?.Values;
+
+						events.Add(e);
+					}
+
+					List<EventGroup> eventGroups = new List<EventGroup>();
+
+					List<TAE.EventGroup> taeEventGroups = taeAnimation.EventGroups;
+					for (int j = 0; j < taeEventGroups.Count; ++j)
+					{
+						TAE.EventGroup taeEventGroup = taeEventGroups[j];
+
+						EventGroup e = new EventGroup();
+
+						e.GroupType = taeEventGroup.GroupType;
+						e.GroupData = taeEventGroup.GroupData;
+						e.Events = taeEventGroup.indices;
+
+						eventGroups.Add(e);
+					}					
+
+					Action action = new Action();
+
+					action.ID = taeAnimation.ID;
+					action.MiniHeader = taeAnimation.MiniHeader;
+					action.FileName = taeAnimation.AnimFileName;
+					action.Reference = reference;
+					action.AnimationFile = animationFile;
+					action.Events = events;
+					action.EventGroups = eventGroups;
+
+					actions.Add(action);
+				}
+
+				Tae aTae = new Tae();
+
+				aTae.ID = tae.ID;
+				aTae.Flags = tae.Flags;
+				aTae.SkeletonName = tae.SkeletonName;
+				aTae.SibName = tae.SibName;
+				aTae.EventBank = tae.EventBank;
+				aTae.Actions = actions;
+
+				var json = Newtonsoft.Json.JsonConvert.SerializeObject(aTae, Newtonsoft.Json.Formatting.Indented);
+				WriteTextFile(json, fullPath);
+			}
+		}
+
+		public string ExportSkeleton(string path, Part part)
+		{
+			NewAnimationContainer animationContainer = part.aniContainer;
+			IBinder anibnd = animationContainer.baseANIBND;
+			if (anibnd == null)
+				return null;
+
+			string originPath = anibnd.Files.Find(e => e.Name.ToLower().Contains("skeleton"))?.Name;
+			string relativePath = ToRelativePath(originPath);
+			relativePath = Path.ChangeExtension(relativePath, "fbx");
+			string fullpath = path + relativePath;
+			CreateDirectory(fullpath);
+
+			using(var context = new AssimpContext())
+			{
+				Assimp.Scene scene = CreateScene(animationContainer);
+				if (context.ExportFile(scene, fullpath, ExportFormatID))
+					return relativePath;
+				else
+					return null;
+			}
+		}
+
+		public List<string> ExportAnimations(string path, Part part)
+		{
+			List<string> animations = new List<string>();
+
+			NewAnimationContainer animationContainer = part.aniContainer;
+			if (animationContainer == null)
+				return animations;
+
+			List<IBinder> binders = new List<IBinder>();
+
+			binders.Add(animationContainer.baseANIBND);
+			binders.AddRange(animationContainer.additionalANIBNDs);
+
+			for (int j = 0; j < binders.Count; ++j)
+			{
+				IBinder binder = binders[j];
+				if (binder == null)
+					continue;
+	
+				for (int k = 0; k < binder.Files.Count; ++k)
+				{
+					BinderFile file = binder.Files[k];
+
+					string originalPath = file.Name;
+					string filename = Path.GetFileName(originalPath).ToLower();
+					if (filename[0] != 'a' || Path.GetExtension(filename) != ".hkx")
 						continue;
 
-					string originalPath = binder.Files.Find(e => e.Name.Contains(animationName))?.Name;
-					if(string.IsNullOrEmpty(originalPath))
-						originalPath = animationContainer.GetAnimationPath(animationName);
-					if(string.IsNullOrEmpty(originalPath))
-					{
-						ErrorLog.LogWarning($@"Unable to find the animation '{animationName}' to export");
-						continue;
-					}
 					string relativePath = ToRelativePath(originalPath);
-					relativePath = ReplacePaths(relativePath);
-					string fullPath = Path.ChangeExtension(path + relativePath, "fbx");
-					ExportAnimation(animationContainer, animationName, fullPath);
+					relativePath = Path.ChangeExtension(relativePath, "fbx");
+					string fullPath = path + relativePath;
+
+					try
+					{
+						if (ExportAnimation(animationContainer, filename, fullPath))
+							animations.Add(relativePath);
+					}
+					catch (Exception ex) 
+					{
+						ErrorLog.LogWarning($"Unable to export {fullPath}. exception: {ex.Message}");
+					}
 				}
 			}
+
+			return animations;
 		}
 
-		public bool ExportAnimation(NewAnimationContainer animContainer, string name, string path)
+		public List<string> ExportMaterials(string path, Part part)
 		{
-			CreateDirectory(path);
-			return ExportAnimationFBX(animContainer, name, path);
-		}
-
-		public void ExportMaterials(string path, List<FLVER2> flvers, List<IBinder> binders)
-		{
-			for (int i = 0; i < flvers.Count; ++i)
-			{
-				FLVER2 flver = flvers[i];
-				IBinder binder = binders[i];
-				ExportMaterials(path, flver, binder);
-			}
-		}
-
-		public void ExportMaterials(string path, FLVER2 flver, IBinder binder)
-		{
-			string originPath = binder.Files.Find(e => e.Name.ToLower().Contains(".flver"))?.Name;
+			FLVER2 flver = part.flver;
+			string flverPath = part.flverPath;
+			string originPath = flverPath;
 			string relativePath = ToRelativePath(originPath);
-			relativePath = ReplacePaths(relativePath);
-			string fullpath = Path.GetDirectoryName(path + relativePath);
+			string relativeDirectory = Path.GetDirectoryName(relativePath);
+
+			List<string> flverMaterialRelativePaths = new List<string>();
 
 			List<FLVER2.Material> flverMaterials = flver.Materials;
 
@@ -293,8 +484,10 @@ namespace DSAnimStudio
 				FLVER2.Material flverMaterial = flverMaterials[i];
 
 				string name = GetIndexName(flverMaterial.Name, i);
-				string jsonFlverMaterialPath = $"{fullpath}\\mat\\{name}.mat";
+				string flverMaterialRelativePath = $"{relativeDirectory}\\mat\\{name}.mat";
+				flverMaterialRelativePaths.Add(flverMaterialRelativePath);
 
+				string jsonFlverMaterialPath = path + flverMaterialRelativePath;
 				ExportFlverMaterial(flverMaterial, name, jsonFlverMaterialPath);
 
 				FlverMaterialDefInfo flverMaterialDefInfo = FlverMaterialDefInfo.Lookup(flverMaterial.MTD);
@@ -310,12 +503,32 @@ namespace DSAnimStudio
 
 				ExportMTD(mtd, jsonMtdPath);
 			}
+
+			return flverMaterialRelativePaths;
+		}
+
+		public void ExportTextures(string path, Part part)
+		{
+			FLVER2 flver = part.flver;
+			List<string> filePaths = GetReferenceTexturePaths(flver);
+			for(int i = 0; i < filePaths.Count; ++i)
+			{
+				string filePath = filePaths[i];
+				string exportPath = path + ToRelativePath(filePath);
+				ExportTexture(exportPath);
+			}
+		}
+
+		public bool ExportAnimation(NewAnimationContainer animContainer, string name, string path)
+		{
+			CreateDirectory(path);
+			return ExportAnimationFBX(animContainer, name, path);
 		}
 
 		public void ExportFlverMaterial(FLVER2.Material material, string name, string path)
 		{
 			List<FLVER2.Texture> textures = new List<FLVER2.Texture>(material.Textures.Count);
-			for(int i = 0; i < material.Textures.Count; ++i)
+			for (int i = 0; i < material.Textures.Count; ++i)
 			{
 				FLVER2.Texture texture = material.Textures[i];
 				FLVER2.Texture jsonTexture = new FLVER2.Texture();
@@ -373,26 +586,6 @@ namespace DSAnimStudio
 			var json = Newtonsoft.Json.JsonConvert.SerializeObject(jsonMaterial, Newtonsoft.Json.Formatting.Indented);
 
 			WriteTextFile(json, path);
-		}
-
-		public void ExportTextures(string path, List<FLVER2> flvers)
-		{
-			for (int i = 0; i < flvers.Count; ++i)
-			{
-				FLVER2 flver = flvers[i];
-				ExportTextures(path, flver);
-			}
-		}
-
-		public void ExportTextures(string path, FLVER2 flver)
-		{
-			List<string> filePaths = GetReferenceTexturePaths(flver);
-			for (int i = 0; i < filePaths.Count; ++i)
-			{
-				string filePath = filePaths[i];
-				string exportPath = path + ToRelativePath(filePath);
-				ExportTexture(exportPath);
-			}
 		}
 
 		public void ExportTexture(string path)
@@ -1260,17 +1453,23 @@ namespace DSAnimStudio
 			return scene;
 		}
 
-		List<FLVER2> GetAllFlvers(ref List<IBinder> binders)
+		List<Part> GetParts()
 		{
-			List<FLVER2> flvers = new List<FLVER2>();
+			List<Part> parts = new List<Part>();
+
+			Part mainPart = new Part();
 
 			Model main = Scene.MainModel;
-			flvers.Add(main.flver);
-			binders?.Add(main.binder);
+			mainPart.flver = main.flver;
+			mainPart.flverPath = main.flverName;
+			mainPart.aniContainer = main.AnimContainer;
+			mainPart.taeContainer = Main.TAE_EDITOR.FileContainer;
+
+			parts.Add(mainPart);
 
 			NewChrAsm charAsm = main.ChrAsm;
 			if (charAsm == null)
-				return flvers;
+				return parts;
 
 			List<NewMesh> meshes = new List<NewMesh>()
 			{
@@ -1293,8 +1492,12 @@ namespace DSAnimStudio
 				if (flver == null)
 					continue;
 
-				flvers.Add(flver);
-				binders?.Add(mesh.binder);
+				Part part = new Part();
+
+				part.flver = flver;
+				part.flverPath = mesh.flverName;
+
+				parts.Add(part);
 			}
 
 			List<Model> models = new List<Model>()
@@ -1316,53 +1519,19 @@ namespace DSAnimStudio
 					continue;
 
 				FLVER2 flver = model.flver;
-				if(flver == null)
+				if (flver == null)
 					continue;
 
-				flvers.Add(flver);
-				binders?.Add(model.binder);
+				Part part = new Part();
+
+				part.flver = flver;
+				part.flverPath = model.flverName;
+				part.aniContainer = model.AnimContainer;
+
+				parts.Add(part);
 			}
 
-			return flvers;
-		}
-
-		List<NewAnimationContainer> GetAllAnimationContainer()
-		{
-			List<NewAnimationContainer> animationContainers = new List<NewAnimationContainer>();
-			
-			Model main = Scene.MainModel;
-			animationContainers.Add(main.AnimContainer);
-
-			NewChrAsm charAsm = main.ChrAsm;
-			if (charAsm == null)
-				return animationContainers;
-
-			List<Model> models = new List<Model>()
-			{
-				charAsm.LeftWeaponModel0,
-				charAsm.LeftWeaponModel1,
-				charAsm.LeftWeaponModel2,
-				charAsm.LeftWeaponModel3,
-				charAsm.RightWeaponModel0,
-				charAsm.RightWeaponModel1,
-				charAsm.RightWeaponModel2,
-				charAsm.RightWeaponModel3,
-			};
-
-			for (int i = 0; i < models.Count; ++i)
-			{
-				Model model = models[i];
-				if (model == null)
-					continue;
-
-				NewAnimationContainer animationContainer = model.AnimContainer;
-				if (animationContainer == null)
-					continue;
-
-				animationContainers.Add(animationContainer);
-			}
-
-			return animationContainers;
+			return parts;
 		}
 
 		bool IsHasAlpha(string path)
@@ -1676,6 +1845,13 @@ namespace DSAnimStudio
 				Directory.CreateDirectory(dir);
 		}
 
+		string ToRelativePath(string path)
+		{
+			string relativePath = RemoveRootPath(path);
+			relativePath = ReplacePaths(relativePath);
+			return relativePath;
+		}
+
 		static readonly string[] Directories = new string[]
 		{
 			"INTERROOT_win64",
@@ -1684,7 +1860,7 @@ namespace DSAnimStudio
 			"data",
 		};
 
-		string ToRelativePath(string path)
+		string RemoveRootPath(string path)
 		{
 			string relativePath = path;
 
@@ -1700,21 +1876,6 @@ namespace DSAnimStudio
 			}
 
 			return relativePath;
-		}
-
-		string ToTexturePath(string path, bool isCheckTransparent = true, bool isTransparent = false)
-		{
-			if(string.IsNullOrEmpty(path))
-				return path;
-
-			string extension = Path.GetExtension(path);
-			if(extension.ToLower().Contains("tif"))
-			{
-				if((isCheckTransparent && IsHasAlpha(path)) || (!isCheckTransparent && isTransparent))
-					path = Path.ChangeExtension(path, ".bmp");
-			}
-
-			return path;
 		}
 
 		static readonly Dictionary<string, string> ReplaceDictionary = new Dictionary<string, string>()
@@ -1755,6 +1916,21 @@ namespace DSAnimStudio
 				relativeToRoot = relativeToRoot.Substring(0, index);
 
 			return relativeToRoot;
+		}
+
+		string ToTexturePath(string path, bool isCheckTransparent = true, bool isTransparent = false)
+		{
+			if(string.IsNullOrEmpty(path))
+				return path;
+
+			string extension = Path.GetExtension(path);
+			if(extension.ToLower().Contains("tif"))
+			{
+				if((isCheckTransparent && IsHasAlpha(path)) || (!isCheckTransparent && isTransparent))
+					path = Path.ChangeExtension(path, ".bmp");
+			}
+
+			return path;
 		}
 
 		const string ExportFormatID = "fbxa";

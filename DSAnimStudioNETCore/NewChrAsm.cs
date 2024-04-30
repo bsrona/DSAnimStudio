@@ -810,6 +810,7 @@ namespace DSAnimStudio
             List<TPF> tpfs = new List<TPF>();
             FLVER2 flver2 = null;
             FLVER0 flver0 = null;
+            string flverName = null;
             foreach (var f in partsbnd.Files)
             {
                 string nameCheck = f.Name.ToLower();
@@ -831,11 +832,13 @@ namespace DSAnimStudio
                     {
                         var readFlver2 = FLVER2.Read(f.Bytes);
                         flver2 = readFlver2;
+                        flverName = f.Name;
                     }
                     catch (Exception ex)
                     {
                         NotificationManager.PushNotification($"Failed to read FLVER2 '{f.Name}' from inside binder. Exception:\n{ex}");
                         flver2 = null;
+                        flverName = null;
                     }
                 }
                 else if (GameRoot.GameType == SoulsAssetPipeline.SoulsGames.DES && (flver0 == null && nameCheck.EndsWith(".flver") || FLVER0.Is(f.Bytes)))
@@ -864,7 +867,7 @@ namespace DSAnimStudio
 
             if (GameRoot.GameType != SoulsAssetPipeline.SoulsGames.DES && flver2 != null)
             {
-                mesh = new NewMesh(flver2, false, boneIndexRemap);
+                mesh = new NewMesh(flver2, flverName, false, boneIndexRemap);
                 mesh.binder = partsbnd;
             }
             else if (GameRoot.GameType == SoulsAssetPipeline.SoulsGames.DES && flver0 != null)

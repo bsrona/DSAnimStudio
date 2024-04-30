@@ -1085,7 +1085,7 @@ namespace DSAnimStudio
                     if (FLVER2.Is(file))
                     {
                         //currModelAddOffset.X += 3;
-                        var m = new Model(FLVER2.Read(file), false);
+                        var m = new Model(FLVER2.Read(file), file, false);
                         m.StartTransform = new Transform(currModelAddOffset, Microsoft.Xna.Framework.Quaternion.Identity);
                         Scene.ClearSceneAndAddModel(m);
                     }

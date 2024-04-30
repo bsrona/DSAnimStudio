@@ -27,7 +27,7 @@ namespace DSAnimStudio.TaeEditor
             Game == SoulsAssetPipeline.SoulsGames.SDT ||
             Game == SoulsAssetPipeline.SoulsGames.ER);
 
-        private (long Upper, long Lower) GetSplitAnimID(long id)
+        public (long Upper, long Lower) GetSplitAnimID(long id)
         {
             return (IsGameLongAnimNames ? (id / 1000000) : (id / 10000),
                 IsGameLongAnimNames ? (id % 1000000) : (id % 10000));

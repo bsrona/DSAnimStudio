@@ -24,6 +24,7 @@ namespace DSAnimStudio.TaeEditor
             ToolExportUnrealEngine.ExportFileType.AnimationSkeleton_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequence_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx,
+            ToolExportUnrealEngine.ExportFileType.Taes_Json,
             ToolExportUnrealEngine.ExportFileType.Textures,
             ToolExportUnrealEngine.ExportFileType.Materials_Json,
         };
@@ -498,29 +499,25 @@ namespace DSAnimStudio.TaeEditor
 			}
 
 			var exportAsFileType = fileTypeSelEntriesMapping[listBoxExportAsFileType.SelectedIndex];
-            if ( exportAsFileType == ToolExportUnrealEngine.ExportFileType.All
-                || exportAsFileType == ToolExportUnrealEngine.ExportFileType.SkeletalMesh_Fbx
-				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx
-				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.Textures
-				|| exportAsFileType == ToolExportUnrealEngine.ExportFileType.Materials_Json)
+            if (exportAsFileType == ToolExportUnrealEngine.ExportFileType.AnimationSequence_Fbx)
 			{
-				var selectFolderDiag = new FolderBrowserDialog();
-
-				if (currentDirectory != null)
-					selectFolderDiag.InitialDirectory = currentDirectory;
-
-    			if (selectFolderDiag.ShowDialog() == DialogResult.OK)
-                    return selectFolderDiag.SelectedPath;
-            }
-            else
-            {
 				var saveFileDialog = new SaveFileDialog();
 
-				if (currentDirectory != null)
+				if(currentDirectory != null)
 					saveFileDialog.InitialDirectory = currentDirectory;
 
-				if (saveFileDialog.ShowDialog() == DialogResult.OK)
+				if(saveFileDialog.ShowDialog() == DialogResult.OK)
 					return saveFileDialog.FileName;
+			}
+			else
+            {
+				var selectFolderDiag = new FolderBrowserDialog();
+
+				if(currentDirectory != null)
+					selectFolderDiag.InitialDirectory = currentDirectory;
+
+				if(selectFolderDiag.ShowDialog() == DialogResult.OK)
+					return selectFolderDiag.SelectedPath;
 			}
 
 			return null;

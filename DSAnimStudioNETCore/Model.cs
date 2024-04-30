@@ -90,6 +90,7 @@ namespace DSAnimStudio
 
         public IBinder binder;
         public FLVER2 flver;
+        public string flverName;
 
         private int _selectedNpcParamIndex = -1;
         public int SelectedNpcParamIndex
@@ -339,8 +340,7 @@ namespace DSAnimStudio
                 {
                     //if (nameCheck.EndsWith($"_{modelIndex}.flver") || modelIndex == 0)
                     flver2 = FLVER2.Read(f.Bytes);
-
-
+                    flverName = f.Name;
 
                     if (modelToImportDuringLoad != null)
                     {
@@ -432,7 +432,7 @@ namespace DSAnimStudio
                 if (flver2 == null)
                     return;
 
-                LoadFLVER2(flver2, useSecondUV: false, baseDmyPolyID, ignoreStaticTransforms);
+                LoadFLVER2(flver2, name, useSecondUV: false, baseDmyPolyID, ignoreStaticTransforms);
                 flver = flver2;
             }
 
@@ -537,10 +537,10 @@ namespace DSAnimStudio
                 new Vector3(0.5f, 1, 0.5f) * 1.75f);
         }
 
-        private void LoadFLVER2(FLVER2 flver, bool useSecondUV, int baseDmyPolyID = 0, bool ignoreStaticTransforms = false)
+        private void LoadFLVER2(FLVER2 flver, string name, bool useSecondUV, int baseDmyPolyID = 0, bool ignoreStaticTransforms = false)
         {
             SkeletonFlver = new NewAnimSkeleton_FLVER(this, flver.Bones);
-            MainMesh = new NewMesh(flver, useSecondUV, null, ignoreStaticTransforms);
+            MainMesh = new NewMesh(flver, name, useSecondUV, null, ignoreStaticTransforms);
             Bounds = MainMesh.Bounds;
             DummyPolyMan.AddAllDummiesFromFlver(flver);
         }
@@ -553,11 +553,11 @@ namespace DSAnimStudio
             DummyPolyMan.AddAllDummiesFromFlver(flver);
         }
 
-        public Model(FLVER2 flver, bool useSecondUV)
+        public Model(FLVER2 flver, string name, bool useSecondUV)
             : this()
         {
             AnimContainer = new NewAnimationContainer();
-            LoadFLVER2(flver, useSecondUV);
+            LoadFLVER2(flver, name, useSecondUV);
         }
 
         public Model(FLVER0 flver, bool useSecondUV)

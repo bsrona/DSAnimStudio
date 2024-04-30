@@ -765,7 +765,7 @@ namespace DSAnimStudio
                 LoadingTaskMan.DoLoadingTaskSynchronous($"LOAD_MAPPIECE_{fullMapID}_{mapPieceName}", $"Loading map piece {mapPieceName} from map {fullMapID}...", progress =>
                 {
                     var flver = FLVER2.Read(mapPieceFileBytes);
-                    chr = new Model(flver, false);
+                    chr = new Model(flver, $@"/map/{fullMapID}/{mapPieceName}.flver.dcx", false);
 
                     List<string> texturesUsed = new List<string>();
                     foreach (var mat in flver.Materials)

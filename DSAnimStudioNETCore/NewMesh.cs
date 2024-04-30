@@ -43,6 +43,7 @@ namespace DSAnimStudio
 
         public IBinder binder;
         public FLVER2 flver;
+        public string flverName;
         public FLVER2.FLVERHeader Flver2Header = null;
 
         public void TryLoadGlobalShaderConfigs()
@@ -89,10 +90,10 @@ namespace DSAnimStudio
             return result;
         }
 
-        public NewMesh(FLVER2 flver, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
+        public NewMesh(FLVER2 flver, string name, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
             bool ignoreStaticTransforms = false)
         {
-            LoadFLVER2(flver, useSecondUV, boneIndexRemap, ignoreStaticTransforms);
+            LoadFLVER2(flver, name, useSecondUV, boneIndexRemap, ignoreStaticTransforms);
         }
 
         public NewMesh(FLVER0 flver, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
@@ -101,10 +102,11 @@ namespace DSAnimStudio
             LoadFLVER0(flver, useSecondUV, boneIndexRemap, ignoreStaticTransforms);
         }
 
-        private void LoadFLVER2(FLVER2 flver, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
+        private void LoadFLVER2(FLVER2 flver, string name, bool useSecondUV, Dictionary<string, int> boneIndexRemap = null,
             bool ignoreStaticTransforms = false)
         {
             this.flver = flver;
+            flverName = name;
             Flver2Header = flver.Header;
 
 
