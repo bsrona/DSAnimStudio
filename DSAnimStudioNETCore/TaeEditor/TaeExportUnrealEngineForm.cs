@@ -21,12 +21,13 @@ namespace DSAnimStudio.TaeEditor
         {
             ToolExportUnrealEngine.ExportFileType.All,
             ToolExportUnrealEngine.ExportFileType.SkeletalMesh_Fbx,
-            ToolExportUnrealEngine.ExportFileType.AnimationSkeleton_Fbx,
+			ToolExportUnrealEngine.ExportFileType.Materials_Json,
+			ToolExportUnrealEngine.ExportFileType.Mtds_Json,
+			ToolExportUnrealEngine.ExportFileType.Textures,
+			ToolExportUnrealEngine.ExportFileType.AnimationSkeleton_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequence_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx,
             ToolExportUnrealEngine.ExportFileType.Taes_Json,
-            ToolExportUnrealEngine.ExportFileType.Textures,
-            ToolExportUnrealEngine.ExportFileType.Materials_Json,
         };
 
         private bool IS_BUSY = false;

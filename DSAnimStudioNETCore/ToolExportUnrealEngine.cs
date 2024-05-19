@@ -37,15 +37,16 @@ namespace DSAnimStudio
         {
 			All,
             SkeletalMesh_Fbx,
+			Materials_Json,
+			Mtds_Json,
+			Textures,
 			AnimationSkeleton_Fbx,
             AnimationSequence_Fbx,
 			AnimationSequences_Fbx,
 			Taes_Json,
-			Textures,
-			Materials_Json,
-        }
+		}
 
-        HavokSplineFixer splineFixer = null;
+		HavokSplineFixer splineFixer = null;
         public void InitForAnimContainer(NewAnimationContainer animContainer)
         {
             if (splineFixer == null)
@@ -70,7 +71,10 @@ namespace DSAnimStudio
 			public string Mesh;
 			public string Skeleton;
 			public List<string> Animations;
+			public List<string> Taes;
 			public List<string> Materials;
+			public List<string> Mtds;
+			public List<string> Textures;
 		}
 
 		public struct Event
@@ -122,6 +126,18 @@ namespace DSAnimStudio
 				{
 					ExportSkeletalMeshes(path);
 				}
+				else if(fileType == ExportFileType.Materials_Json)
+				{
+					ExportMaterials(path);
+				}
+				else if(fileType == ExportFileType.Mtds_Json)
+				{
+					ExportMtds(path);
+				}
+				else if(fileType == ExportFileType.Textures)
+				{
+					ExportTextures(path);
+				}
 				else if (fileType == ExportFileType.AnimationSkeleton_Fbx)
 				{
 					ExportSkeletons(path);
@@ -135,17 +151,9 @@ namespace DSAnimStudio
 				{
 					ExportAnimations(path);
 				}
-				else if (fileType == ExportFileType.Taes_Json)
+				else if(fileType == ExportFileType.Taes_Json)
 				{
 					ExportTaes(path);
-				}
-				else if (fileType == ExportFileType.Textures)
-				{
-					ExportTextures(path);
-				}
-				else if (fileType == ExportFileType.Materials_Json)
-				{
-					ExportMaterials(path);
 				}
 			}
 			catch (Exception ex)
@@ -167,12 +175,12 @@ namespace DSAnimStudio
 
 				PartFile partFile = new PartFile();
 
-				ExportTextures(path, part);
-
+				partFile.Textures = ExportTextures(path, part);
+				partFile.Mtds = ExportMtds(path, part);
 				partFile.Materials = ExportMaterials(path, part);
 				partFile.Skeleton = ExportSkeleton(path, part);
 				partFile.Animations = ExportAnimations(path, part);
-				ExportTaes(path, part);
+				partFile.Taes = ExportTaes(path, part);
 				partFile.Mesh = ExportSkeletalMesh(path, part);
 
 				var json = Newtonsoft.Json.JsonConvert.SerializeObject(partFile, Newtonsoft.Json.Formatting.Indented);
@@ -240,6 +248,17 @@ namespace DSAnimStudio
 			}
 		}
 
+		public void ExportMtds(string path)
+		{
+			List<Part> parts = GetParts();
+
+			for(int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+				ExportMtds(path, part);
+			}
+		}
+
 		public void ExportTextures(string path)
 		{
 			List<Part> parts = GetParts();
@@ -277,11 +296,13 @@ namespace DSAnimStudio
             }
         }
 
-		public void ExportTaes(string path, Part part)
+		public List<string> ExportTaes(string path, Part part)
 		{
+			List<string> taePaths = new List<string>();
+
 			TaeFileContainer container = part.taeContainer;
 			if (container == null)
-				return;
+				return taePaths;
 
 			IBinder binder = container.containerANIBND;
 			IReadOnlyDictionary<string, TAE> taes = container.AllTAEDict;
@@ -394,7 +415,11 @@ namespace DSAnimStudio
 
 				var json = Newtonsoft.Json.JsonConvert.SerializeObject(aTae, Newtonsoft.Json.Formatting.Indented);
 				WriteTextFile(json, fullPath);
+
+				taePaths.Add(relativePath);
 			}
+
+			return taePaths;
 		}
 
 		public string ExportSkeleton(string path, Part part)
@@ -489,34 +514,60 @@ namespace DSAnimStudio
 
 				string jsonFlverMaterialPath = path + flverMaterialRelativePath;
 				ExportFlverMaterial(flverMaterial, name, jsonFlverMaterialPath);
-
-				FlverMaterialDefInfo flverMaterialDefInfo = FlverMaterialDefInfo.Lookup(flverMaterial.MTD);
-				if (flverMaterialDefInfo == null)
-					continue;
-
-				MTD mtd = flverMaterialDefInfo.mtd;
-				if (mtd == null)
-					continue;
-
-				string mtdPath = ToRelativePath(flverMaterial.MTD);
-				string jsonMtdPath = path + mtdPath;
-
-				ExportMTD(mtd, jsonMtdPath);
 			}
 
 			return flverMaterialRelativePaths;
 		}
 
-		public void ExportTextures(string path, Part part)
+		public List<string> ExportMtds(string path, Part part)
 		{
+			List<string> mtdPaths = new List<string>();
+
+			FLVER2 flver = part.flver;
+
+			List<FLVER2.Material> flverMaterials = flver.Materials;
+			List<FLVER2.Mesh> flverMeshes = flver.Meshes;
+
+			for (int i = 0; i < flverMaterials.Count; ++i)
+			{
+				FLVER2.Material flverMaterial = flverMaterials[i];
+
+				FlverMaterialDefInfo flverMaterialDefInfo = FlverMaterialDefInfo.Lookup(flverMaterial.MTD);
+				if (flverMaterialDefInfo == null)
+					continue;
+
+				FLVER2.Mesh mesh = flverMeshes.Find(e => e.MaterialIndex == i);
+				FLVER2.FaceSet faceSet = mesh.FaceSets.First();
+				bool isTwoSide = faceSet == null ? false : !faceSet.CullBackfaces;
+
+				string mtdPath = ToRelativePath(flverMaterial.MTD);
+				string jsonMtdPath = path + mtdPath;
+
+				ExportMTD(flverMaterialDefInfo, jsonMtdPath, isTwoSide);
+				mtdPaths.Add(mtdPath);
+			}
+
+			return mtdPaths;
+		}
+
+		public List<string> ExportTextures(string path, Part part)
+		{
+			List<string> texturePaths = new List<string>();
+
 			FLVER2 flver = part.flver;
 			List<string> filePaths = GetReferenceTexturePaths(flver);
 			for(int i = 0; i < filePaths.Count; ++i)
 			{
 				string filePath = filePaths[i];
-				string exportPath = path + ToRelativePath(filePath);
-				ExportTexture(exportPath);
+				string relativePath = ToRelativePath(filePath);
+				string exportPath = path + relativePath;
+				if (!ExportTexture(exportPath))
+					continue;
+
+				texturePaths.Add(relativePath);
 			}
+
+			return texturePaths;
 		}
 
 		public bool ExportAnimation(NewAnimationContainer animContainer, string name, string path)
@@ -558,19 +609,36 @@ namespace DSAnimStudio
 			WriteTextFile(json, path);
 		}
 
-		public void ExportMTD(MTD material, string path)
+		public void ExportMTD(FlverMaterialDefInfo flverMaterialDefInfo, string path, bool isTwoSide)
 		{
+			MTD material = flverMaterialDefInfo.mtd;
+			if (material == null)
+				return;
+
+			var samplerConfigs = flverMaterialDefInfo.SamplerConfigs;
+
 			List<MTD.Texture> textures = new List<MTD.Texture>(material.Textures.Count);
 			for (int i = 0; i < material.Textures.Count; ++i)
 			{
 				MTD.Texture texture = material.Textures[i];
+				String texturePath = texture.Path;
+
+				if (string.IsNullOrEmpty(texturePath))
+				{
+					if (samplerConfigs.ContainsKey(texture.Type))
+					{
+						var samplerConfig = samplerConfigs[texture.Type];
+						texturePath = samplerConfig.DefaultTexPath;
+					}
+				}
+
 				MTD.Texture jsonTexture = new MTD.Texture();
 
 				jsonTexture.Type = texture.Type;
 				jsonTexture.Extended = texture.Extended;
 				jsonTexture.UVNumber = texture.UVNumber;
 				jsonTexture.ShaderDataIndex = texture.ShaderDataIndex;
-				jsonTexture.Path = ToRelativePath(ToTexturePath(texture.Path));
+				jsonTexture.Path = ToRelativePath(ToTexturePath(texturePath));
 				jsonTexture.UnkFloats = texture.UnkFloats;
 
 				textures.Add(jsonTexture);
@@ -583,23 +651,36 @@ namespace DSAnimStudio
 			jsonMaterial.Params = material.Params;
 			jsonMaterial.Textures = textures;
 
+			if (isTwoSide)
+			{
+				List<MTD.Param> newParams = new List<MTD.Param>(material.Params.Count);
+				for (int i = 0; i < material.Params.Count; ++i)
+				{
+					MTD.Param param = material.Params[i];
+					MTD.Param newParam = new MTD.Param(param.Name, param.Type, param.Value);
+					newParams.Add(newParam);
+				}
+				jsonMaterial.Params = newParams;
+				jsonMaterial.Params.Add(new MTD.Param("g_bTwoSide", MTD.ParamType.Bool, true));
+			}
+
 			var json = Newtonsoft.Json.JsonConvert.SerializeObject(jsonMaterial, Newtonsoft.Json.Formatting.Indented);
 
 			WriteTextFile(json, path);
 		}
 
-		public void ExportTexture(string path)
+		public bool ExportTexture(string path)
 		{
 			var shortName = Utils.GetShortIngameFileName(path).ToLower();
 			if (!TexturePool.Fetches.ContainsKey(shortName))
-				return;
+				return false;
 
 			TextureFetchRequest request = TexturePool.Fetches[shortName];
 			byte[] ddsBytes = request?.TexInfo?.DDSBytes;
 			if (ddsBytes == null)
-				return;
+				return false;
 
-			ExportTexture(ddsBytes, path);
+			return ExportTexture(ddsBytes, path);
 		}
 
 		public bool ExportAnimationFBX(NewAnimationContainer animContainer, string name, string path)
@@ -712,7 +793,7 @@ namespace DSAnimStudio
 			return data;
 		}
 
-		void ExportTexture(byte[] ddsBytes, string path)
+		bool ExportTexture(byte[] ddsBytes, string path)
 		{
 			CreateDirectory(path);
 
@@ -734,6 +815,11 @@ namespace DSAnimStudio
 
 						var bitmap = new System.Drawing.Bitmap(image.Width, image.Height, stride, pixelFormat, data);
 						bitmap.Save(exportPath, imageFormat);
+						return true;
+					}
+					catch(Exception e)
+					{
+						return false;
 					}
 					finally
 					{
