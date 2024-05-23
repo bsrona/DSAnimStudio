@@ -22,9 +22,20 @@ namespace DSAnimStudio.TaeEditor
             get => listBoxFiles.SelectedItem as string;
         }
 
-        public void InitEblFileList(List<string> eblFiles, string defaultOptionStartMatch, string exactMatchDefault)
+        public List<string> SelectedEblFiles()
+        {
+            List<string> strings = new List<string>();
+            foreach(string str in listBoxFiles.SelectedItems)
+            {
+                strings.Add(str);
+            }
+            return strings;
+        }
+
+        public void InitEblFileList(List<string> eblFiles, string defaultOptionStartMatch, string exactMatchDefault, SelectionMode selectionMode = SelectionMode.One)
         {
             listBoxFiles.Items.Clear();
+            listBoxFiles.SelectionMode = selectionMode;
             //listBoxFiles.Items.AddRange(eblFiles.Cast<object>().ToArray());
             bool foundDefaultOption = false;
             for (int i = 0; i < eblFiles.Count; i++)

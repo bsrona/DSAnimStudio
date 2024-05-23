@@ -523,6 +523,7 @@ namespace DSAnimStudio.ImguiOSD
             bool clicked_Tools_AnimNameExport = false;
             bool clicked_Tools_AnimNameImport = false;
             //bool clicked_Tools_AnimationImporter = false;
+            bool clicked_Tools_ScriptExport = false;
             bool clicked_Tools_ManageTaeSections = false;
             bool clicked_Tools_ManageAnimationFiles = false;
             bool clicked_Tools_UnrealEngine = false;
@@ -557,6 +558,11 @@ namespace DSAnimStudio.ImguiOSD
 
                 if (ClickItem("Import All Animation Names...", enabled: Tae?.IsFileOpen == true && !LoadingTaskMan.AnyTasksRunning()))
                     clicked_Tools_AnimNameImport = true;
+
+                ImGui.Separator();
+
+                if(ClickItem("Export All Scripts...", enabled: Tae?.IsFileOpen == true && !LoadingTaskMan.AnyTasksRunning()))
+                    clicked_Tools_ScriptExport = true;
 
                 //ImGui.Separator();
 
@@ -743,6 +749,14 @@ namespace DSAnimStudio.ImguiOSD
             //{
             //    Tae.BringUpImporter_FBXAnim();
             //}
+            else if(clicked_Tools_ScriptExport)
+            {
+                Main.MainThreadLazyDispatch(() =>
+                {
+                    Tae.ShowExportAllScriptsDialog();
+                });
+
+            }
             else if(clicked_Tools_UnrealEngine)
             {
                 Main.MainThreadLazyDispatch(() =>

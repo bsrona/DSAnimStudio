@@ -542,13 +542,6 @@ namespace DSAnimStudio
                         DefaultTexPath = metaparamEntry?.DefaultTexturePath,
 						UVScale = new Vector2(uvScaleX, uvScaleY),
 					});
-
-                    if (string.IsNullOrEmpty(metaparamEntry?.DefaultTexturePath))
-                    {
-                        int fuck = 0;
-                        fuck++;
-                        metaparam = LoadMetaParam(result.ShaderName);
-                    }
 				}
 
 				foreach(var p in mtd.Params)

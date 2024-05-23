@@ -1924,7 +1924,7 @@ namespace DSAnimStudio
 			File.WriteAllText(path, content);
 		}
 
-		void CreateDirectory(string path)
+		public static void CreateDirectory(string path)
 		{
 			var dir = Path.GetDirectoryName(path);
 			if (!Directory.Exists(dir))
@@ -1946,7 +1946,7 @@ namespace DSAnimStudio
 			"data",
 		};
 
-		string RemoveRootPath(string path)
+		public static string RemoveRootPath(string path)
 		{
 			string relativePath = path;
 

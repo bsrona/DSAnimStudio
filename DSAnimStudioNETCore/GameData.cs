@@ -756,7 +756,20 @@ namespace DSAnimStudio
             return result == System.Windows.Forms.DialogResult.OK ? picker.SelectedEblFile : null;
         }
 
-        public static byte[] ReadSoundFile(string relativePath)
+		public static List<string> ShowPicksInsideBndPath(string folder, string searchRegex, string defaultOptionMatchStart, string title, string exactMatchDefault)
+		{
+			var possibleFiles = GameData.SearchFiles(folder, searchRegex);
+			if(possibleFiles.Count == 0)
+				return null;
+			var picker = new TaeEditor.TaeLoadFromArchivesFilePicker();
+			picker.Text = title;
+			picker.StartInCenterOf(Main.WinForm);
+			picker.InitEblFileList(possibleFiles, defaultOptionMatchStart, exactMatchDefault, System.Windows.Forms.SelectionMode.MultiExtended);
+			var result = picker.ShowDialog();
+			return result == System.Windows.Forms.DialogResult.OK ? picker.SelectedEblFiles() : null;
+		}
+
+		public static byte[] ReadSoundFile(string relativePath)
         {
             byte[] result = null;
             lock (_lock_DataArchives)

@@ -15,6 +15,7 @@ using SharpDX.DirectWrite;
 using System.IO;
 using System.Threading.Tasks;
 using DSAnimStudio.ImguiOSD;
+using static SoulsAssetPipeline.Animation.TAE;
 
 namespace DSAnimStudio.TaeEditor
 {
@@ -363,7 +364,75 @@ namespace DSAnimStudio.TaeEditor
             }
         }
 
-        public void ShowExportUnrealEngineDialog()
+        public void ShowExportAllScriptsDialog()
+        {
+			var luabnds = GameData.ShowPicksInsideBndPath("/script/", @".*.luabnd.dcx$", "", "Choose luabnd", "");
+            if (luabnds.Count == 0)
+                return;
+
+			var selectFolderDiag = new System.Windows.Forms.FolderBrowserDialog();
+			if (selectFolderDiag.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+				return;
+
+			string destPath = selectFolderDiag.SelectedPath;
+
+			var exePathDiag = new System.Windows.Forms.OpenFileDialog()
+			{
+				Filter = "Lua Decompiler (*.exe)|*.exe",
+				ValidateNames = true,
+				CheckFileExists = true,
+				CheckPathExists = true,
+			};
+			if (exePathDiag.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+				return;
+
+            string exePath = exePathDiag.FileName;
+
+			for (int i = 0; i < luabnds.Count; i++)
+            {
+                string luabnd = luabnds[i];
+                string directory = Path.GetFileNameWithoutExtension(luabnd);
+				directory = Path.GetFileNameWithoutExtension(directory);
+				var bndBytes = GameData.ReadFile(luabnd);
+
+				IBinder bnd = null;
+				if (BND3.Is(bndBytes))
+					bnd = BND3.Read(bndBytes);
+				else if (BND4.Is(bndBytes))
+					bnd = BND4.Read(bndBytes);
+                if (bnd == null)
+                    continue;
+
+                List<BinderFile> files = bnd.Files;
+                foreach (BinderFile file in files)
+                {
+                    string relativePath = ToolExportUnrealEngine.RemoveRootPath(file.Name);
+                    relativePath = relativePath.Replace("\\out\\bin\\", $"\\{directory}\\");
+                    string extension = Path.GetExtension(relativePath);
+                    
+					string fullPath = destPath + relativePath;
+                    ToolExportUnrealEngine.CreateDirectory(fullPath);
+
+                    if (extension.ToLower() == ".lua")
+                    {
+						string tempPath = Path.GetTempFileName();
+						File.WriteAllBytes(tempPath, file.Bytes);
+
+                        string command = $"\"{exePath}\" \"{tempPath}\" -o \"{fullPath}\"";
+
+                        ProcessStartInfo processInfo = new ProcessStartInfo(command);
+                        processInfo.WindowStyle = ProcessWindowStyle.Hidden;
+						Process.Start(processInfo);
+					}
+					else
+					{
+                        File.WriteAllBytes(fullPath, file.Bytes);
+                    }
+				}
+			}
+		}
+
+		public void ShowExportUnrealEngineDialog()
         {
 			GameWindowAsForm.Invoke(new Action(() =>
             {
