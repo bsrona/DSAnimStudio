@@ -1918,7 +1918,7 @@ namespace DSAnimStudio
 			return result;
 		}
 
-		void WriteTextFile(string content, string path)
+		public static void WriteTextFile(string content, string path)
 		{
 			CreateDirectory(path);
 			File.WriteAllText(path, content);

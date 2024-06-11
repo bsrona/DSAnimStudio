@@ -68,8 +68,12 @@ namespace DSAnimStudio.TaeEditor
             if (listBoxFiles.SelectedIndex >= 0)
             {
                 DialogResult = DialogResult.OK;
-                Close();
             }
-        }
-    }
+            else
+            {
+                DialogResult = DialogResult.Cancel;
+            }
+			Close();
+		}
+	}
 }

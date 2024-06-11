@@ -366,8 +366,10 @@ namespace DSAnimStudio.TaeEditor
 
         public void ShowExportAllScriptsDialog()
         {
-			var luabnds = GameData.ShowPicksInsideBndPath("/script/", @".*.luabnd.dcx$", "", "Choose luabnd", "");
-            if (luabnds.Count == 0)
+			List<string> luabnds = GameData.ShowPicksInsideBndPath("/script/", @".*.luabnd.dcx$", "", "Choose luabnd", "");
+			List<string> actionHKS = GameData.ShowPicksInsideBndPath("/action/", @".*", "", "Choose action", "");
+
+			if (luabnds.Count == 0 && actionHKS.Count == 0)
                 return;
 
 			var selectFolderDiag = new System.Windows.Forms.FolderBrowserDialog();
@@ -424,12 +426,52 @@ namespace DSAnimStudio.TaeEditor
                         processInfo.WindowStyle = ProcessWindowStyle.Hidden;
 						Process.Start(processInfo);
 					}
+                    else if (extension.ToLower() == ".luagnl")
+                    {
+						LUAGNL lua = LUAGNL.Read(file.Bytes);
+						var json = Newtonsoft.Json.JsonConvert.SerializeObject(lua, Newtonsoft.Json.Formatting.Indented);
+						ToolExportUnrealEngine.WriteTextFile(json, fullPath);
+					}
+					else if (extension.ToLower() == ".luainfo")
+                    {
+						LUAINFO lua = LUAINFO.Read(file.Bytes);
+						var json = Newtonsoft.Json.JsonConvert.SerializeObject(lua, Newtonsoft.Json.Formatting.Indented);
+						ToolExportUnrealEngine.WriteTextFile(json, fullPath);
+					}
 					else
 					{
                         File.WriteAllBytes(fullPath, file.Bytes);
                     }
 				}
 			}
+
+            for (int i = 0; i < actionHKS.Count; i++)
+            {
+                string relativePath = actionHKS[i];
+				var actionBytes = GameData.ReadFile(relativePath);
+				string extension = Path.GetExtension(relativePath);
+
+				string fullPath = destPath + relativePath;
+				ToolExportUnrealEngine.CreateDirectory(fullPath);
+
+				if(extension.ToLower() == ".hks")
+				{
+					fullPath = Path.ChangeExtension(fullPath, "lua");
+					string tempPath = Path.GetTempFileName();
+					File.WriteAllBytes(tempPath, actionBytes);
+
+					string command = $"\"{exePath}\" \"{tempPath}\" -o \"{fullPath}\"";
+
+					ProcessStartInfo processInfo = new ProcessStartInfo(command);
+					processInfo.WindowStyle = ProcessWindowStyle.Hidden;
+					Process.Start(processInfo);
+				}
+				else
+				{
+					File.WriteAllBytes(fullPath, actionBytes);
+				}
+			}
+
 		}
 
 		public void ShowExportUnrealEngineDialog()

@@ -760,13 +760,13 @@ namespace DSAnimStudio
 		{
 			var possibleFiles = GameData.SearchFiles(folder, searchRegex);
 			if(possibleFiles.Count == 0)
-				return null;
+				return new List<string>();
 			var picker = new TaeEditor.TaeLoadFromArchivesFilePicker();
 			picker.Text = title;
 			picker.StartInCenterOf(Main.WinForm);
 			picker.InitEblFileList(possibleFiles, defaultOptionMatchStart, exactMatchDefault, System.Windows.Forms.SelectionMode.MultiExtended);
 			var result = picker.ShowDialog();
-			return result == System.Windows.Forms.DialogResult.OK ? picker.SelectedEblFiles() : null;
+			return result == System.Windows.Forms.DialogResult.OK ? picker.SelectedEblFiles() : new List<string>();
 		}
 
 		public static byte[] ReadSoundFile(string relativePath)
