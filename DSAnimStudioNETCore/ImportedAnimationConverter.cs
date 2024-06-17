@@ -1,4 +1,5 @@
-﻿using SoulsAssetPipeline.Animation;
+﻿using HKX2;
+using SoulsAssetPipeline.Animation;
 using SoulsAssetPipeline.AnimationImporting;
 using SoulsFormats;
 using System;
@@ -56,7 +57,7 @@ namespace DSAnimStudio
                 skeleton.m_localFrames = new List<HKX2.hkaSkeletonLocalFrameOnBone>();
                 skeleton.m_referenceFloats = new List<float>();
                 skeleton.m_floatSlots = new List<string>();
-                skeleton.m_referencePose = new List<System.Numerics.Matrix4x4>();
+                skeleton.m_referencePose = new List<hkQsTransform>();
 
                 skeleton.m_bones = new List<HKX2.hkaBone>();
                 for (int i = 0; i < hk_skeleton.Bones.Size; i++)

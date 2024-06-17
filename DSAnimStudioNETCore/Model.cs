@@ -10,6 +10,10 @@ using FMOD;
 using SoulsAssetPipeline;
 using DSAnimStudio.ImguiOSD;
 using DSAnimStudio.DebugPrimitives;
+using Havoc.Objects;
+using Havoc.IO.Tagfile.Binary;
+using SoulsAssetPipeline.Animation;
+using HKX2;
 
 namespace DSAnimStudio
 {
@@ -75,11 +79,24 @@ namespace DSAnimStudio
 
         public NewAnimSkeleton_FLVER SkeletonFlver;
         public NewAnimationContainer AnimContainer;
+        public hkRootLevelContainer ragdollLevelContainer
+        {
+            get { return _ragdollLevelContainer; }
+            set
+            {
+                if (_ragdollLevelContainer == value)
+                    return;
+                _ragdollLevelContainer = value;
+                CreateRagdollPrimitives();
+            }
+        }
+        hkRootLevelContainer _ragdollLevelContainer;
 
         public bool IsRemoModel = false;
 
         public NewDummyPolyManager DummyPolyMan;
         public DBG.DbgPrimDrawer DbgPrimDrawer;
+        public List<IDbgPrim> RagdollPrims;
         public NewChrAsm ChrAsm = null;
         public ParamData.NpcParam NpcParam = null;
 
@@ -418,6 +435,11 @@ namespace DSAnimStudio
                         anibnd = BND4.Read(f.Bytes);
                     }
                 }
+                else if (nameCheck.EndsWith(".hkx") && !nameCheck.Contains("_c."))
+                {
+					IHavokObject container = HKX.Load(f.Bytes);
+                    ragdollLevelContainer = container as hkRootLevelContainer;
+                }
             }
 
             if (GameRoot.GameType == SoulsGames.DES)
@@ -687,6 +709,8 @@ namespace DSAnimStudio
 
             if (DBG.GetCategoryEnableDraw(DebugPrimitives.DbgPrimCategory.HkxBone))
                 AnimContainer?.Skeleton?.DrawPrimitives();
+
+            DrawRagdoll(CurrentTransform.WorldMatrix);
         }
 
         public void DrawAllPrimitiveTexts()
@@ -833,6 +857,84 @@ namespace DSAnimStudio
             }
         }
 
+        public void DrawRagdoll(Matrix WorldMatrix)
+        {
+            if (ragdollLevelContainer == null)
+                return;
+
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            if (ragdollData == null)
+                return;
+
+			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(ragdollLevelContainer);
+			if (skeletonMapper == null)
+				return;
+
+			var simpleMapping = skeletonMapper.m_mapping.m_simpleMappings;
+            if (simpleMapping == null)
+                return;
+
+            if (skeletonMapper.m_mapping.m_chainMappings != null)
+                skeletonMapper.m_mapping.m_chainMappings = skeletonMapper.m_mapping.m_chainMappings;
+
+            var hkxSkeleton = SkeletonFlver.HavokSkeletonThisIsMappedTo.HkxSkeleton;
+
+			hkaSkeleton ragdollSkeleton = ragdollData.m_skeleton;
+            List<int> boneToBodyMap = ragdollData.m_boneToBodyMap;
+            var bodyInfos = ragdollData.m_bodyCinfos;
+            for (int i = 0; i < RagdollPrims.Count; ++i)
+            {
+                IDbgPrim prim = RagdollPrims[i];
+                if (prim == null)
+                    continue;
+                
+                int ragdollBoneIndex = boneToBodyMap.Find(e => e == i);
+                if (ragdollBoneIndex < 0)
+                    continue;
+
+                int mapIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneIndex);
+                if (mapIndex < 0)
+                    continue;
+
+                int boneIndex = simpleMapping[mapIndex].m_boneA;
+                Matrix boneMatrix = hkxSkeleton[boneIndex].CurrentMatrix;
+                Matrix referenceMatrix = hkxSkeleton[boneIndex].ReferenceMatrix;
+                referenceMatrix.Decompose(out Vector3 scale, out Quaternion rotation, out Vector3 translation);
+
+                hknpBodyCinfo body = bodyInfos[i];
+
+                DbgPrimWireCapsule capsule = prim as DbgPrimWireCapsule;
+                hknpCapsuleShape hkcapsule = body.m_shape as hknpCapsuleShape;
+                if (capsule != null && hkcapsule != null)
+                {
+                    Matrix objectTransform = Matrix.CreateFromQuaternion(Quaternion.Normalize(new Quaternion(
+                        body.m_orientation.X,
+                        body.m_orientation.Y,
+                        body.m_orientation.Z,
+                        body.m_orientation.W)))
+                    * Matrix.CreateTranslation(new Vector3(
+                        body.m_position.X,
+                        body.m_position.Y,
+                        body.m_position.Z));
+
+                    Matrix transform = objectTransform * Matrix.Invert(referenceMatrix) * boneMatrix;
+
+                    Vector4 a = hkcapsule.m_a;
+                    Vector4 b = hkcapsule.m_b;
+                    float radius = a.W;
+
+                    Vector3 a3 = new Vector3(a.X, a.Y, a.Z);
+                    a3 = Vector3.Transform(a3, transform);
+                    Vector3 b3 = new Vector3(b.X, b.Y, b.Z);
+                    b3 = Vector3.Transform(b3, transform);
+
+                    capsule.UpdateCapsuleEndPoints(a3, b3, new ParamData.AtkParam.Hit() {DummyPolySourceSpawnedOn = ParamData.AtkParam.DummyPolySource.Body, Radius = radius}, null, null, null);
+                }
+
+                prim.Draw(null, WorldMatrix);
+            }
+        }
+
         public void Dispose()
         {
             DbgPrimDrawer?.Dispose();
@@ -842,6 +944,53 @@ namespace DSAnimStudio
             MainMesh?.Dispose();
             // Do not need to dispose DummyPolyMan because it goes 
             // stores its primitives in the model's DbgPrimDrawer
+        }
+
+        void CreateRagdollPrimitives()
+        {
+            RagdollPrims = new List<IDbgPrim>();
+            if (ragdollLevelContainer == null)
+                return;
+
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            if (ragdollData == null)
+                return;
+
+            var bodyInfos = ragdollData.m_bodyCinfos;
+            for (int i = 0; i < bodyInfos.Count; ++i)
+            {
+                var bodyInfo = bodyInfos[i];
+                IDbgPrim primitive = CreateRigbody(bodyInfo);
+                RagdollPrims.Add(primitive);
+            }
+        }
+
+        static T GetHavokObject<T>(hkRootLevelContainer container) where T : class
+        {
+            var element = container.m_namedVariants.Find(e => e.m_variant is T);
+            return element.m_variant as T;
+        }
+
+        IDbgPrim CreateRigbody(hknpBodyCinfo bodyInfo)
+        {
+            IDbgPrim primitive = null;
+
+            hknpShape shape = bodyInfo.m_shape;
+            switch (shape.m_type)
+            {
+                case hknpShapeType.Enum.CAPSULE:
+                    {
+                        primitive = new DbgPrimWireCapsule(Color.Green);
+                        primitive.OverrideColor = Color.Green;
+                        primitive.Category = DbgPrimCategory.Ragdoll;
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+
+            return primitive;
         }
     }
 }

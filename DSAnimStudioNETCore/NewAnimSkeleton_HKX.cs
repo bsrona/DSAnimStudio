@@ -133,7 +133,7 @@ namespace DSAnimStudio
 
                 do
                 {
-                    result = HkxSkeleton[j].RelativeReferenceMatrix * result;
+                    result = result * HkxSkeleton[j].RelativeReferenceMatrix;
                     j = HkxSkeleton[j].ParentIndex;
                 }
                 while (j >= 0);
