@@ -104,7 +104,7 @@
 			listBoxExportAsFileType.ForeColor = System.Drawing.Color.White;
 			listBoxExportAsFileType.FormattingEnabled = true;
 			listBoxExportAsFileType.ItemHeight = 17;
-			listBoxExportAsFileType.Items.AddRange(new object[] { "All", "SkeletalMesh(FBX)", "Materials(MAT)", "MTDs(MTD)", "Textures", "AnimationSkeleton(FBX)", "AnimationSequence(FBX)", "AnimationSequences(FBX)", "Taes(TAE)" });
+			listBoxExportAsFileType.Items.AddRange(new object[] { "All", "SkeletalMesh(FBX)", "PhysicsAsset(PHY)", "Materials(MAT)", "MTDs(MTD)", "Textures", "AnimationSkeleton(FBX)", "AnimationSequence(FBX)", "AnimationSequences(FBX)", "Taes(TAE)" });
 			listBoxExportAsFileType.Location = new System.Drawing.Point(125, 58);
 			listBoxExportAsFileType.Name = "listBoxExportAsFileType";
 			listBoxExportAsFileType.Size = new System.Drawing.Size(493, 70);

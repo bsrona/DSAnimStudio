@@ -37,6 +37,7 @@ namespace DSAnimStudio
         {
 			All,
             SkeletalMesh_Fbx,
+			PhysicsAsset_Json,
 			Materials_Json,
 			Mtds_Json,
 			Textures,
@@ -126,6 +127,10 @@ namespace DSAnimStudio
 				{
 					ExportSkeletalMeshes(path);
 				}
+				else if(fileType == ExportFileType.PhysicsAsset_Json)
+				{
+					ExportPhysicsAssets(path);
+				}
 				else if(fileType == ExportFileType.Materials_Json)
 				{
 					ExportMaterials(path);
@@ -198,6 +203,18 @@ namespace DSAnimStudio
 				Part part = parts[i];
 
 				ExportSkeletalMesh(path, part);
+			}
+		}
+
+		public void ExportPhysicsAssets(string path)
+		{
+			List<Part> parts = GetParts();
+
+			for(int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+
+				ExportPhysicsAsset(path, part);
 			}
 		}
 
@@ -295,6 +312,11 @@ namespace DSAnimStudio
 					return null;
             }
         }
+
+		public string ExportPhysicsAsset(string path, Part part)
+		{
+			return null;
+		}
 
 		public List<string> ExportTaes(string path, Part part)
 		{

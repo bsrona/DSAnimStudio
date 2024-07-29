@@ -645,7 +645,12 @@ namespace DSAnimStudio.ImguiOSD
 							DBG.CategoryEnableDraw[DebugPrimitives.DbgPrimCategory.Ragdoll] =
 								MenuBar.Checkbox("Ragdoll",
 								DBG.CategoryEnableDraw[DebugPrimitives.DbgPrimCategory.Ragdoll],
-								enabled: true, shortcut: "(This Color)", shortcutColor: Main.Colors.ColorHelperFlverBoneBoundingBox);
+								enabled: true, shortcut: "(This Color)", shortcutColor: Main.Colors.ColorHelperRagdoll);
+
+							DBG.CategoryEnableNameDraw[DebugPrimitives.DbgPrimCategory.Ragdoll] =
+								MenuBar.Checkbox("Ragdoll Names",
+								DBG.CategoryEnableNameDraw[DebugPrimitives.DbgPrimCategory.Ragdoll],
+								enabled: true, shortcut: "(This Color)", shortcutColor: Main.Colors.ColorHelperRagdoll);
 
                             DBG.CategoryEnableDraw[DebugPrimitives.DbgPrimCategory.DummyPoly] =
                                 MenuBar.Checkbox("DummyPoly",

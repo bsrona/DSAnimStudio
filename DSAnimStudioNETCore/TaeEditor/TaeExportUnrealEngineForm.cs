@@ -21,6 +21,7 @@ namespace DSAnimStudio.TaeEditor
         {
             ToolExportUnrealEngine.ExportFileType.All,
             ToolExportUnrealEngine.ExportFileType.SkeletalMesh_Fbx,
+            ToolExportUnrealEngine.ExportFileType.PhysicsAsset_Json,
 			ToolExportUnrealEngine.ExportFileType.Materials_Json,
 			ToolExportUnrealEngine.ExportFileType.Mtds_Json,
 			ToolExportUnrealEngine.ExportFileType.Textures,

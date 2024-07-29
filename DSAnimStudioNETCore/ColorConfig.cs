@@ -19,6 +19,8 @@ namespace DSAnimStudio
         public Color ColorHelperFlverBoneBoundingBox { get; set; } = Color.Lime;
         public Color ColorHelperDummyPoly { get; set; } = Color.MonoGameOrange;
         public Color ColorHelperDummyPolyDbg { get; set; } = Color.Yellow;
+		public Color ColorHelperRagdoll { get; set; } = Color.DodgerBlue;
+		public Color ColorHelperRagdollConstraint { get; set; } = Color.Red;
         public Color ColorHelperSoundEvent { get; set; } = Color.Red;
 
         public Color ColorHelperDummyPolySpawnSFX { get; set; } = Color.Cyan;
