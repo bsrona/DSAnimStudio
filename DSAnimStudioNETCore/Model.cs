@@ -82,7 +82,7 @@ namespace DSAnimStudio
 
         public NewAnimSkeleton_FLVER SkeletonFlver;
         public NewAnimationContainer AnimContainer;
-        public hkRootLevelContainer ragdollLevelContainer
+        public hkRootLevelContainer RagdollLevelContainer
         {
             get { return _ragdollLevelContainer; }
             set
@@ -95,7 +95,7 @@ namespace DSAnimStudio
             }
         }
         hkRootLevelContainer _ragdollLevelContainer;
-        Matrix[] ragdollPoseMatrices;
+        public Matrix[] RagdollPoseMatrices;
 
         public bool IsRemoModel = false;
 
@@ -444,7 +444,7 @@ namespace DSAnimStudio
                 else if (nameCheck.EndsWith(".hkx") && !nameCheck.Contains("_c."))
                 {
 					IHavokObject container = HKX.Load(f.Bytes);
-                    ragdollLevelContainer = container as hkRootLevelContainer;
+                    RagdollLevelContainer = container as hkRootLevelContainer;
                 }
             }
 
@@ -911,14 +911,14 @@ namespace DSAnimStudio
 
         public void DrawRagdollBodies(Matrix WorldMatrix)
         {
-            if (ragdollLevelContainer == null)
+            if (RagdollLevelContainer == null)
                 return;
 
-            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(RagdollLevelContainer);
             if (ragdollData == null)
                 return;
 
-			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(ragdollLevelContainer);
+			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(RagdollLevelContainer);
 			if (skeletonMapper == null)
 				return;
 
@@ -949,20 +949,11 @@ namespace DSAnimStudio
                     continue;
 
                 int referenceBoneIndex = simpleMapping[mapIndex].m_boneA;
-				//hkQsTransform mapTransform = simpleMapping[mapIndex].m_aFromBTransform;
-				//float translateDis = Vector3.DistanceSquared(new Vector3(mapTransform.m_translation.X, mapTransform.m_translation.Y, mapTransform.m_translation.Z), Vector3.Zero);
-				//float scaleDis = Vector3.DistanceSquared(new Vector3(mapTransform.m_scale.X, mapTransform.m_scale.Y, mapTransform.m_scale.Z), Vector3.One);
-				//float rotateDis = Vector4.DistanceSquared(new Vector4(mapTransform.m_rotation.X, mapTransform.m_rotation.Y, mapTransform.m_rotation.Z, mapTransform.m_rotation.W), new Vector4(0, 0, 0, 1));
-
-				//if(translateDis > 0.000001f || scaleDis > 0.000001f || rotateDis > 0.000001f)
-				//{
-				//	continue;
-				//}
 
 				string boneName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneIndex].m_name;
                 int boneIndex = hkxSkeleton.FindIndex(e => e.Name == boneName);
 				Matrix boneMatrix = hkxSkeleton[boneIndex].CurrentMatrix;
-                Matrix poseMatrix = ragdollPoseMatrices[ragdollBoneIndex];
+                Matrix poseMatrix = RagdollPoseMatrices[ragdollBoneIndex];
 
                 hknpBodyCinfo body = bodyInfos[i];
 
@@ -995,7 +986,7 @@ namespace DSAnimStudio
 
                     for (int index = 0; index < capsule.UnparentedChildren.Count; ++index)
                     {
-                        capsule.UnparentedChildren[index].Transform = new Transform(Matrix.CreateScale(Vector3.One * 0.2f) * transform);
+                        capsule.UnparentedChildren[index].Transform = new Transform(Matrix.CreateScale(Vector3.One * 0.2f) * boneMatrix);
                     }
                 }
 
@@ -1013,14 +1004,14 @@ namespace DSAnimStudio
 
         public void DrawRagdollConstraints(Matrix WorldMatrix)
         {
-            if (ragdollLevelContainer == null)
+            if (RagdollLevelContainer == null)
                 return;
 
-            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(RagdollLevelContainer);
             if (ragdollData == null)
                 return;
 
-			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(ragdollLevelContainer);
+			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(RagdollLevelContainer);
 			if (skeletonMapper == null)
 				return;
 
@@ -1075,8 +1066,8 @@ namespace DSAnimStudio
 				Matrix boneAMatrix = hkxSkeleton[boneAIndex].CurrentMatrix;
                 Matrix boneBMatrix = hkxSkeleton[boneBIndex].CurrentMatrix;
 
-                Matrix poseAMatrix = ragdollPoseMatrices[ragdollBoneAIndex];
-                Matrix poseBMatrix = ragdollPoseMatrices[ragdollBoneBIndex];
+                Matrix poseAMatrix = RagdollPoseMatrices[ragdollBoneAIndex];
+                Matrix poseBMatrix = RagdollPoseMatrices[ragdollBoneBIndex];
 
                 hknpBodyCinfo bodyAInfo = bodyInfos[bodyAIndex];
 				hknpBodyCinfo bodyBInfo = bodyInfos[bodyBIndex];
@@ -1123,14 +1114,8 @@ namespace DSAnimStudio
                     Matrix localTransformA = transforms.m_transformA;
                     Matrix localTransformB = transforms.m_transformB;
                     
-                    Vector3 axis = new Vector3(localTransformB.M11, localTransformB.M12, localTransformB.M13);
-                    Vector3 axisPrep = new Vector3(localTransformB.M31, localTransformB.M32, localTransformB.M33);
-
                     Vector3 translateA = localTransformA.Translation;
 					Vector3 translateB = localTransformB.Translation;
-
-                    var rotationA = Microsoft.Xna.Framework.Quaternion.CreateFromRotationMatrix(localTransformA);
-					var rotationB = Microsoft.Xna.Framework.Quaternion.CreateFromRotationMatrix(localTransformB);
 
 					Matrix transformA = objectATransform * poseAMatrix * boneAMatrix;
                     Matrix transformB = objectBTransform * poseBMatrix * boneBMatrix;
@@ -1171,10 +1156,10 @@ namespace DSAnimStudio
 
         void UpdateRagdollPose()
         {
-            if (ragdollLevelContainer == null)
+            if (RagdollLevelContainer == null)
                 return;
 
-            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(RagdollLevelContainer);
             if (ragdollData == null)
                 return;
 
@@ -1199,23 +1184,23 @@ namespace DSAnimStudio
 						transform.m_translation.Z));
 			}
 
-            ragdollPoseMatrices = new Matrix[referenceMatrices.Length];
+            RagdollPoseMatrices = new Matrix[referenceMatrices.Length];
             for (int i = 0; i < referenceMatrices.Length; ++i)
             {
-				ragdollPoseMatrices[i] = referenceMatrices[i];
+				RagdollPoseMatrices[i] = referenceMatrices[i];
 
 				int parentIndex = skeleton.m_parentIndices[i];
 
 				while (parentIndex >= 0)
 				{
-					ragdollPoseMatrices[i] = ragdollPoseMatrices[i] * referenceMatrices[parentIndex];
+					RagdollPoseMatrices[i] = RagdollPoseMatrices[i] * referenceMatrices[parentIndex];
 					parentIndex = skeleton.m_parentIndices[parentIndex];
 				}
 			}
 
-            for (int i = 0; i < ragdollPoseMatrices.Length; ++i)
+            for (int i = 0; i < RagdollPoseMatrices.Length; ++i)
             {
-                ragdollPoseMatrices[i] = Matrix.Invert(ragdollPoseMatrices[i]);
+                RagdollPoseMatrices[i] = Matrix.Invert(RagdollPoseMatrices[i]);
             }
 		}
 
@@ -1228,10 +1213,10 @@ namespace DSAnimStudio
         void CreateRagdollBodies()
         {
             RagdollBodies = new List<IDbgPrim>();
-            if (ragdollLevelContainer == null)
+            if (RagdollLevelContainer == null)
                 return;
 
-            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+            hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(RagdollLevelContainer);
             if (ragdollData == null)
                 return;
 
@@ -1247,10 +1232,10 @@ namespace DSAnimStudio
         void CreateRagdollConstraints()
         {
 			RagdollConstraints = new List<IDbgPrim>();
-			if (ragdollLevelContainer == null)
+			if (RagdollLevelContainer == null)
 				return;
 
-			hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+			hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(RagdollLevelContainer);
 			if(ragdollData == null)
 				return;
 
@@ -1327,9 +1312,9 @@ namespace DSAnimStudio
 				primitive = new DbgPrimWireRagdoll(twist, twistLimit.m_minAngle, twistLimit.m_maxAngle, normal);
                 DbgPrimWireCone cone = new DbgPrimWireCone(twist, ragdollConstraintData.m_atoms.m_coneLimit.m_maxAngle, Color.Yellow);
                 primitive.Children.Add(cone);
-				DbgPrimWireCone planeMin = new DbgPrimWireCone(-normal, MathHelper.PiOver2 - Math.Abs(planeLimit.m_minAngle), Color.Yellow);
+				DbgPrimWireCone planeMin = new DbgPrimWireCone(-normal, MathHelper.PiOver2 - Math.Abs(planeLimit.m_minAngle), Color.Bisque);
 				primitive.Children.Add(planeMin);
-				DbgPrimWireCone planeMax = new DbgPrimWireCone(normal, MathHelper.PiOver2 - Math.Abs(planeLimit.m_maxAngle), Color.Yellow);
+				DbgPrimWireCone planeMax = new DbgPrimWireCone(normal, MathHelper.PiOver2 - Math.Abs(planeLimit.m_maxAngle), Color.Tan);
 				primitive.Children.Add(planeMax);
 			}
 			else if (constraintData is hkpLimitedHingeConstraintData)
@@ -1338,9 +1323,9 @@ namespace DSAnimStudio
 				hkpSetLocalTransformsConstraintAtom transforms = limitedHingeConstraintData.m_atoms.m_transforms;
                 hkpAngLimitConstraintAtom limit = limitedHingeConstraintData.m_atoms.m_angLimit;
 
-                Vector3 axis = new Vector3(transforms.m_transformB.M11, transforms.m_transformB.M12, transforms.m_transformB.M13);
-				Vector3 prep = new Vector3(transforms.m_transformB.M31, transforms.m_transformB.M32, transforms.m_transformB.M33);
-                Vector3 limitAxis = new Vector3(transforms.m_transformA.M31, transforms.m_transformA.M32, transforms.m_transformA.M33);
+                Vector3 axis = GetColumn(ref transforms.m_transformB, 0);
+				Vector3 prep = GetColumn(ref transforms.m_transformB, 2);
+                Vector3 limitAxis = GetColumn(ref transforms.m_transformA, 2);
 				primitive = new DbgPrimWireHing(axis, prep, limit.m_minAngle, limit.m_maxAngle);
                 DbgPrimWire limitAxisPrimitive = new DbgPrimWire();
                 limitAxisPrimitive.AddLine(Vector3.Zero, limitAxis * 0.1f, Color.White);
@@ -1360,7 +1345,7 @@ namespace DSAnimStudio
                 string bodyAName = ragdollData.m_bodyCinfos[bodyAIndex].m_name;
 				string bodyBName = ragdollData.m_bodyCinfos[bodyBIndex].m_name;
 
-				primitive.Name = $"{constraintInfo.m_name}\n[{bodyBName}->{bodyAName}]";
+				primitive.Name = $"{constraintInfo.m_name}\n[{bodyBName}->{bodyAName}]{(constraintData as hkpRagdollConstraintData)?.m_atoms.m_coneLimit.m_maxAngle}";
                 primitive.NameColor = constraintColor;
 				primitive.Category = DbgPrimCategory.Ragdoll;
 			}

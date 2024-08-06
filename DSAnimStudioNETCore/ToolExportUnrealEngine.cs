@@ -28,6 +28,7 @@ using System.Reflection;
 using static DSAnimStudio.ToolExportUnrealEngine;
 using static SoulsAssetPipeline.Animation.TAE.EventGroup;
 using static SoulsAssetPipeline.Animation.TAE.Animation;
+using System.Data;
 
 namespace DSAnimStudio
 {
@@ -65,17 +66,138 @@ namespace DSAnimStudio
 			public string flverPath;
 			public NewAnimationContainer aniContainer;
 			public TaeFileContainer taeContainer;
+			public hkRootLevelContainer ragdollContainer;
+			public Matrix[] ragdollPoseMatrices;
 		}
 
 		public struct PartFile
 		{
 			public string Mesh;
 			public string Skeleton;
+			public string PhysicsAsset;
 			public List<string> Animations;
 			public List<string> Taes;
 			public List<string> Materials;
 			public List<string> Mtds;
 			public List<string> Textures;
+		}
+
+		public enum CombineMode
+		{
+			/** Uses the average value of the materials touching: (a+b)/2 */
+			Average = 0,
+			/** Uses the minimum value of the materials touching: min(a,b) */
+			Min = 1,
+			/** Uses the product of the values of the materials touching: a*b */
+			Multiply = 2,
+			/** Uses the maximum value of materials touching: max(a,b) */
+			Max = 3
+		}
+
+		public class PhysicsMaterial
+		{
+			public string Name;
+			//public uint m_isExclusive;
+			//public int m_flags;
+			//public TriggerType m_triggerType;
+			//public hkUFloat8 m_triggerManifoldTolerance;
+			public float DynamicFriction;
+			public float StaticFriction;
+			public float Restitution;
+			public CombineMode FrictionCombineMode;
+			public CombineMode RestitutionCombineMode;
+			//public float m_weldingTolerance;
+			//public float m_maxContactImpulse;
+			//public float m_fractionOfClippedImpulseToApply;
+			//public MassChangerCategory m_massChangerCategory;
+			//public hknpHalf m_massChangerHeavyObjectFactor;
+			//public hknpHalf m_softContactForceFactor;
+			//public hknpHalf m_softContactDampFactor;
+			//public hkUFloat8 m_softContactSeparationVelocity;
+			//public hknpSurfaceVelocity m_surfaceVelocity;
+			//public hknpHalf m_disablingCollisionsBetweenCvxCvxDynamicObjectsDistance;
+			//public ulong m_userData;
+			//public bool m_isShared;
+		}
+
+		public class Shape
+		{
+			public hknpShapeType.Enum Type;
+		}
+
+		public class Capsule : Shape
+		{
+			public float Radius;
+			public float Length;
+			public System.Numerics.Vector3 Center;
+			public System.Numerics.Quaternion Rotation;
+		}
+
+		public struct Body
+		{
+			public string Name;
+			public string BoneName;
+			public hknpMotionType.Enum MotionType;
+
+			public float LinearDamping;
+			public float AngularDamping;
+
+			public float Mass;
+			public float Volume;
+			public System.Numerics.Vector4 CenterOfMass;
+			public System.Numerics.Vector4 IntertiaTensor;
+			public System.Numerics.Quaternion MajorAxisSpace;
+
+			public int MaterialIndex;
+
+			public Shape Shape;
+		}
+
+		public enum EAngularConstraintMotion
+		{
+			/** No constraint against this axis. */
+			Free,
+			/** Limited freedom along this axis. */
+			Limited,
+			/** Fully constraint against this axis. */
+			Locked,
+
+			Count,
+		};
+
+		public struct Constraint
+		{
+			public string Name;
+
+			public string BoneAName;
+			public string BoneBName;
+
+			public int BodyAIndex;
+			public int BodyBIndex;
+
+			public System.Numerics.Vector3 Pos1;
+			public System.Numerics.Vector3 Pos2;
+
+			public System.Numerics.Vector3 PriAxis1;
+			public System.Numerics.Vector3 PriAxis2;
+
+			public System.Numerics.Vector3 SecAxis1;
+			public System.Numerics.Vector3 SecAxis2;
+
+			public float Swing1LimitDegrees;
+			public float Swing2LimitDegrees;
+			public float TwistLimitDegrees;
+
+			public EAngularConstraintMotion Swing1Motion;
+			public EAngularConstraintMotion Swing2Motion;
+			public EAngularConstraintMotion TwistMotion;
+		}
+
+		public struct Ragdoll
+		{
+			public List<PhysicsMaterial> Materials;
+			public List<Body> Bodies;
+			public List<Constraint> Constraints;
 		}
 
 		public struct Event
@@ -184,6 +306,7 @@ namespace DSAnimStudio
 				partFile.Mtds = ExportMtds(path, part);
 				partFile.Materials = ExportMaterials(path, part);
 				partFile.Skeleton = ExportSkeleton(path, part);
+				partFile.PhysicsAsset = ExportPhysicsAsset(path, part);
 				partFile.Animations = ExportAnimations(path, part);
 				partFile.Taes = ExportTaes(path, part);
 				partFile.Mesh = ExportSkeletalMesh(path, part);
@@ -315,7 +438,33 @@ namespace DSAnimStudio
 
 		public string ExportPhysicsAsset(string path, Part part)
 		{
-			return null;
+			FLVER2 flver = part.flver;
+			string flverPath = part.flverPath;
+
+			string originPath = flverPath;
+
+			string relativePath = ToRelativePath(originPath);
+			relativePath = Path.ChangeExtension(relativePath, "rag");
+
+			string fullPath = path + relativePath;
+
+			CreateDirectory(fullPath);
+
+			List<PhysicsMaterial> physicsMaterials = ExportPhysicsMaterials(part);
+			List<Body> bodies = ExportBodies(part);
+			List<Constraint> constraints = ExportConstraints(part);
+
+			physicsMaterials = RemapPhysicsMaterials(physicsMaterials, bodies);
+
+			Ragdoll ragdoll = new Ragdoll();
+			ragdoll.Materials = physicsMaterials;
+			ragdoll.Bodies = bodies;
+			ragdoll.Constraints = constraints;
+
+			var json = Newtonsoft.Json.JsonConvert.SerializeObject(ragdoll, Newtonsoft.Json.Formatting.Indented);
+			WriteTextFile(json, fullPath);
+
+			return relativePath;
 		}
 
 		public List<string> ExportTaes(string path, Part part)
@@ -1484,6 +1633,438 @@ namespace DSAnimStudio
 			return mesh;
 		}
 
+		List<PhysicsMaterial> ExportPhysicsMaterials(Part part)
+		{
+			List<PhysicsMaterial> physicsMaterials = new List<PhysicsMaterial>();
+
+			hkRootLevelContainer ragdollLevelContainer = part.ragdollContainer;
+			if (ragdollLevelContainer == null)
+				return physicsMaterials;
+
+			hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+			var materials = ragdollData.m_materials;
+
+			for (int i = 0; i < materials.Count; ++i)
+			{
+				hknpMaterial hkMapterial = materials[i];
+
+				PhysicsMaterial physicsMateiral = CreatePhysicsMaterial(hkMapterial);
+
+				physicsMaterials.Add(physicsMateiral);
+			}
+
+			return physicsMaterials;
+		}
+
+		List<Body> ExportBodies(Part part)
+		{
+			List<Body> bodies = new List<Body>();
+
+			hkRootLevelContainer ragdollLevelContainer = part.ragdollContainer;
+			if (ragdollLevelContainer == null)
+				return bodies;
+
+			hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(ragdollLevelContainer);
+			var simpleMapping = skeletonMapper.m_mapping.m_simpleMappings;
+
+			hkaSkeleton ragdollSkeleton = ragdollData.m_skeleton;
+			List<hknpMotionProperties> motionProperties = ragdollData.m_motionProperties;
+			List<int> boneToBodyMap = ragdollData.m_boneToBodyMap;
+			var bodyInfos = ragdollData.m_bodyCinfos;
+
+			for (int i = 0; i < bodyInfos.Count; ++i)
+			{
+				hknpBodyCinfo bodyInfo = bodyInfos[i];
+				if (bodyInfo == null)
+					continue;
+
+				int ragdollBoneIndex = boneToBodyMap.Find(e => e == i);
+				if (ragdollBoneIndex < 0)
+					continue;
+
+				int mapIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneIndex);
+				if (mapIndex < 0)
+					continue;
+
+				int referenceBoneIndex = simpleMapping[mapIndex].m_boneA;
+
+				string boneName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneIndex].m_name;
+
+				Matrix poseMatrix = part.ragdollPoseMatrices[ragdollBoneIndex];
+
+				hknpMotionProperties motionProperty = motionProperties[bodyInfo.m_motionPropertiesId];
+				Body body = CreateBody(bodyInfo, motionProperty, boneName, poseMatrix);
+
+				bodies.Add(body);
+			}
+
+			return bodies;
+		}
+
+		List<Constraint> ExportConstraints(Part part)
+		{
+			List<Constraint> constraints = new List<Constraint>();
+			hkRootLevelContainer ragdollLevelContainer = part.ragdollContainer;
+			if (ragdollLevelContainer == null)
+				return constraints;
+
+			Matrix[] poseMatrices = part.ragdollPoseMatrices;
+
+			hknpRagdollData ragdollData = GetHavokObject<hknpRagdollData>(ragdollLevelContainer);
+			hkaSkeletonMapper skeletonMapper = GetHavokObject<hkaSkeletonMapper>(ragdollLevelContainer);
+			var simpleMapping = skeletonMapper.m_mapping.m_simpleMappings;
+
+			hkaSkeleton ragdollSkeleton = ragdollData.m_skeleton;
+			List<int> boneToBodyMap = ragdollData.m_boneToBodyMap;
+
+			var bodyInfos = ragdollData.m_bodyCinfos;
+			var constraintInfos = ragdollData.m_constraintCinfos;
+
+			for (int i = 0; i < constraintInfos.Count; ++i)
+			{
+				hknpConstraintCinfo constraintInfo = constraintInfos[i];
+				if (constraintInfo == null)
+					continue;
+
+                int bodyAIndex = (int)(constraintInfo.m_bodyA.m_serialAndIndex & 0x00FFFFFF);
+				int bodyBIndex = (int)(constraintInfo.m_bodyB.m_serialAndIndex & 0x00FFFFFF);
+
+				int ragdollBoneAIndex = boneToBodyMap.Find(e => e == bodyAIndex);
+                if (ragdollBoneAIndex < 0)
+                    continue;
+
+				int ragdollBoneBIndex = boneToBodyMap.Find(e => e == bodyBIndex);
+				if(ragdollBoneBIndex < 0)
+					continue;
+
+				int mapAIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneAIndex);
+                if (mapAIndex < 0)
+                    continue;
+
+				int mapBIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneBIndex);
+				if (mapBIndex < 0)
+					continue;
+
+				int referenceBoneAIndex = simpleMapping[mapAIndex].m_boneA;
+				int referenceBoneBIndex = simpleMapping[mapBIndex].m_boneA;
+
+				string boneAName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneAIndex].m_name;
+				string boneBName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneBIndex].m_name;
+
+                Matrix poseAMatrix = poseMatrices[ragdollBoneAIndex];
+                Matrix poseBMatrix = poseMatrices[ragdollBoneBIndex];
+
+                hknpBodyCinfo bodyAInfo = bodyInfos[bodyAIndex];
+				hknpBodyCinfo bodyBInfo = bodyInfos[bodyBIndex];
+
+				Constraint constraint = CreateConstraint(constraintInfo, bodyAInfo, bodyBInfo, boneAName, boneBName, poseAMatrix, poseBMatrix);
+
+				constraints.Add(constraint);
+			}
+
+			return constraints;
+		}
+
+		List<PhysicsMaterial> RemapPhysicsMaterials(List<PhysicsMaterial> physicsMaterials, List<Body> bodies)
+		{
+			List<PhysicsMaterial> remapPhysicsMaterials = new List<PhysicsMaterial>();
+			List<int> remapIndices = new List<int>(physicsMaterials.Count);
+
+			for (int i = 0; i < physicsMaterials.Count; ++i)
+			{
+				PhysicsMaterial physicsMaterial = physicsMaterials[i];
+				int remapIndex = remapPhysicsMaterials.FindIndex(e => Equal(e, physicsMaterial));
+				if (remapIndex < 0)
+				{
+					remapIndex = remapPhysicsMaterials.Count;
+					remapPhysicsMaterials.Add(physicsMaterial);
+				}
+				remapIndices.Add(remapIndex);
+			}
+
+			for (int i = 0; i < bodies.Count; ++i)
+			{
+				Body body = bodies[i];
+				body.MaterialIndex = remapIndices[body.MaterialIndex];
+				bodies[i] = body;
+			}
+
+			return remapPhysicsMaterials;
+		}
+
+		PhysicsMaterial CreatePhysicsMaterial(hknpMaterial hkMaterial)
+		{
+			PhysicsMaterial material = new PhysicsMaterial();
+
+			material.Name = hkMaterial.m_name;
+			material.DynamicFriction = Unpack(hkMaterial.m_dynamicFriction);
+			material.StaticFriction = Unpack(hkMaterial.m_staticFriction);
+			material.Restitution = Unpack(hkMaterial.m_restitution);
+			material.FrictionCombineMode = ToCombineMode(hkMaterial.m_frictionCombinePolicy);
+			material.RestitutionCombineMode = ToCombineMode(hkMaterial.m_restitutionCombinePolicy);
+
+			return material;
+		}
+
+		Body CreateBody(hknpBodyCinfo bodyInfo, hknpMotionProperties motionProperty, string boneName, Matrix poseMatrix)
+		{
+			Matrix objectTransform = Matrix.CreateFromQuaternion(Microsoft.Xna.Framework.Quaternion.Normalize(new Microsoft.Xna.Framework.Quaternion(
+					bodyInfo.m_orientation.X,
+					bodyInfo.m_orientation.Y,
+					bodyInfo.m_orientation.Z,
+					bodyInfo.m_orientation.W)))
+				* Matrix.CreateTranslation(new Vector3(
+					bodyInfo.m_position.X,
+					bodyInfo.m_position.Y,
+					bodyInfo.m_position.Z));
+
+			Matrix transform = objectTransform * poseMatrix;
+
+			Shape shape = null;
+			if (bodyInfo.m_shape.m_type == hknpShapeType.Enum.CAPSULE)
+			{
+				hknpCapsuleShape capsuleShape = bodyInfo.m_shape as hknpCapsuleShape;
+				Vector4 a = capsuleShape.m_a;
+				Vector4 b = capsuleShape.m_b;
+				float radius = a.W;
+
+				Vector3 a3 = new Vector3(a.X, a.Y, a.Z);
+				a3 = Vector3.Transform(a3, transform);
+				Vector3 b3 = new Vector3(b.X, b.Y, b.Z);
+				b3 = Vector3.Transform(b3, transform);
+
+				Vector3 axis = a3 - b3;
+				Vector3 center = (a3 + b3) * 0.5f;
+				float length = axis.Length();
+				axis.Normalize();
+
+				System.Numerics.Quaternion rotation = System.Numerics.Quaternion.Identity;
+
+				if ((axis - Vector3.UnitZ).LengthSquared() > 0.000001f)
+				{
+					Vector3 rotateAxis = Vector3.Cross(Vector3.UnitZ, axis);
+					float angle = MathF.Acos(axis.Z);
+					rotation = System.Numerics.Quaternion.CreateFromAxisAngle(To(rotateAxis), angle);
+				}
+
+				System.Numerics.Quaternion mirror = System.Numerics.Quaternion.CreateFromAxisAngle(To(Vector3.UnitX), MathF.PI);
+				
+				Capsule capsule = new Capsule();
+
+				capsule.Center = To(Vector3.Transform(center, mirror)) * To(UnitScale);
+				capsule.Length = length * UnitScale.X;
+				capsule.Radius = radius * UnitScale.X;
+				capsule.Rotation = mirror * rotation;
+
+				shape = capsule;
+			}
+
+			if (shape != null)
+				shape.Type = bodyInfo.m_shape.m_type;
+
+			hkCompressedMassProperties compressedMassProperties = (bodyInfo.m_shape.m_properties.m_entries[0].m_object as hknpShapeMassProperties)?.m_compressedMassProperties;
+			System.Numerics.Vector4 inertia = Unpack(compressedMassProperties.m_inertia);
+			System.Numerics.Vector4 centerOfMass = Unpack(compressedMassProperties.m_centerOfMass);
+			System.Numerics.Vector4 majorAxisSpace = Unpack(compressedMassProperties.m_majorAxisSpace);
+
+			Body body = new Body();
+
+			body.Name = bodyInfo.m_name;
+			body.BoneName = boneName;
+			body.MotionType = bodyInfo.m_motionType;
+			body.LinearDamping = motionProperty.m_linearDamping;
+			body.AngularDamping = motionProperty.m_angularDamping;
+			body.Mass = bodyInfo.m_mass < 0 ? compressedMassProperties.m_mass * 0.1f : bodyInfo.m_mass;
+			body.Volume = compressedMassProperties.m_volume;
+			body.CenterOfMass = centerOfMass;
+			body.IntertiaTensor = inertia;
+			body.MajorAxisSpace = new System.Numerics.Quaternion(majorAxisSpace.X, majorAxisSpace.Y, majorAxisSpace.Z, majorAxisSpace.W);
+			body.MaterialIndex = bodyInfo.m_materialId;
+			body.Shape = shape;
+
+			return body;
+		}
+
+		Constraint CreateConstraint(hknpConstraintCinfo constraintInfo, hknpBodyCinfo bodyAInfo, hknpBodyCinfo bodyBInfo, string boneAName, string boneBName, Matrix poseAMatrix, Matrix poseBMatrix)
+		{
+			Vector3 translateA = Vector3.Zero;
+			Vector3 translateB = Vector3.Zero;
+
+			Vector3 axisXA = System.Numerics.Vector3.UnitX;
+			Vector3 axisYA = System.Numerics.Vector3.UnitY;
+			Vector3 axisZA = System.Numerics.Vector3.UnitZ;
+
+			Vector3 axisXB = System.Numerics.Vector3.UnitX;
+			Vector3 axisYB = System.Numerics.Vector3.UnitY;
+			Vector3 axisZB = System.Numerics.Vector3.UnitZ;
+
+			float Swing1LimitDegrees = 0.0f;
+			float Swing2LimitDegrees = 0.0f;
+			float TwistLimitDegrees = 0.0f;
+
+			EAngularConstraintMotion Swing1Motion = EAngularConstraintMotion.Limited;
+			EAngularConstraintMotion Swing2Motion = EAngularConstraintMotion.Limited;
+			EAngularConstraintMotion TwistMotion = EAngularConstraintMotion.Limited;
+
+			hkpSetLocalTransformsConstraintAtom transforms = null;
+			hkpRagdollConstraintData ragdollConstraintData = constraintInfo.m_constraintData as hkpRagdollConstraintData;
+			if (ragdollConstraintData != null)
+				transforms = ragdollConstraintData.m_atoms.m_transforms;
+
+			hkpLimitedHingeConstraintData limitedHingeConstraintData = null;
+			if (transforms == null)
+			{
+				limitedHingeConstraintData = constraintInfo.m_constraintData as hkpLimitedHingeConstraintData;
+				if(limitedHingeConstraintData != null)
+				{
+					transforms = limitedHingeConstraintData.m_atoms.m_transforms;
+				}
+			}
+
+			if (transforms != null)
+            {
+				Matrix objectATransform = Matrix.CreateFromQuaternion(Microsoft.Xna.Framework.Quaternion.Normalize(new Microsoft.Xna.Framework.Quaternion(
+						bodyAInfo.m_orientation.X,
+						bodyAInfo.m_orientation.Y,
+						bodyAInfo.m_orientation.Z,
+						bodyAInfo.m_orientation.W)))
+					* Matrix.CreateTranslation(new Vector3(
+						bodyAInfo.m_position.X,
+						bodyAInfo.m_position.Y,
+						bodyAInfo.m_position.Z));
+
+				Matrix objectBTransform = Matrix.CreateFromQuaternion(Microsoft.Xna.Framework.Quaternion.Normalize(new Microsoft.Xna.Framework.Quaternion(
+						bodyBInfo.m_orientation.X,
+						bodyBInfo.m_orientation.Y,
+						bodyBInfo.m_orientation.Z,
+						bodyBInfo.m_orientation.W)))
+					* Matrix.CreateTranslation(new Vector3(
+						bodyBInfo.m_position.X,
+						bodyBInfo.m_position.Y,
+						bodyBInfo.m_position.Z));
+
+				Matrix transformA = objectATransform * poseAMatrix;
+				Matrix transformB = objectBTransform * poseBMatrix;
+
+				Matrix localTransformA = transforms.m_transformA;
+				Matrix localTransformB = transforms.m_transformB;
+
+				Vector3 localTranslateA = localTransformA.Translation;
+				Vector3 localTranslateB = localTransformB.Translation;
+
+				translateA = Vector3.Transform(localTranslateA, transformA);
+				translateB = Vector3.Transform(localTranslateB, transformB);
+
+				if (ragdollConstraintData != null)
+				{
+					hkpTwistLimitConstraintAtom twistLimit = ragdollConstraintData.m_atoms.m_twistLimit;
+					hkpConeLimitConstraintAtom coneLimit = ragdollConstraintData.m_atoms.m_coneLimit;
+					hkpConeLimitConstraintAtom planesLimit = ragdollConstraintData.m_atoms.m_planesLimit;
+
+					Vector3 localAxisXA = GetColumn(ref localTransformA, twistLimit.m_twistAxis);
+					Vector3 localAxisYA = GetColumn(ref localTransformA, twistLimit.m_refAxis);
+					Vector3 localAxisZA = GetColumn(ref localTransformA, planesLimit.m_refAxisInB);
+
+					Vector3 localAxisXB = GetColumn(ref localTransformB, twistLimit.m_twistAxis);
+					Vector3 localAxisYB = GetColumn(ref localTransformB, twistLimit.m_refAxis);
+					Vector3 localAxisZB = GetColumn(ref localTransformB, planesLimit.m_refAxisInB);
+
+					axisXA = Vector3.TransformNormal(localAxisXA, transformA);
+					axisXA.Normalize();
+					axisYA = Vector3.TransformNormal(localAxisYA, transformA);
+					axisYA.Normalize();
+					axisZA = Vector3.Cross(axisXA, axisYA);
+
+					axisXB = Vector3.TransformNormal(localAxisXB, transformB);
+					axisXB.Normalize();
+					axisYB = Vector3.TransformNormal(localAxisYB, transformB);
+					axisYB.Normalize();
+					axisZB = Vector3.Cross(axisXB, axisYB);
+
+					Swing1LimitDegrees = MathF.Min((planesLimit.m_maxAngle - planesLimit.m_minAngle) * 0.5f, coneLimit.m_maxAngle);
+					Swing2LimitDegrees = coneLimit.m_maxAngle;
+					TwistLimitDegrees = (twistLimit.m_maxAngle - twistLimit.m_minAngle) * 0.5f;
+
+					float deltaAngle = twistLimit.m_minAngle + TwistLimitDegrees;
+					if (MathF.Abs(deltaAngle) > 0.000001f)
+					{
+						Microsoft.Xna.Framework.Quaternion rotate = Microsoft.Xna.Framework.Quaternion.CreateFromAxisAngle(axisXB, deltaAngle);
+						axisYB = Vector3.Transform(axisYB, rotate);
+						axisZB = Vector3.Transform(axisZB, rotate);
+					}
+				}
+				else if (limitedHingeConstraintData != null)
+				{
+					Vector3 localAxisZA = GetColumn(ref localTransformA, 0);
+					Vector3 localAxisXA = GetColumn(ref localTransformA, 2);
+
+					Vector3 localAxisZB = GetColumn(ref localTransformB, 0);
+					Vector3 localAxisXB = GetColumn(ref localTransformB, 2);
+
+					axisZA = Vector3.TransformNormal(localAxisZA, transformA);
+					axisZA.Normalize();
+					axisXA = Vector3.TransformNormal(localAxisXA, transformA);
+					axisXA.Normalize();
+					axisYA = Vector3.Cross(axisZA, axisXA);
+
+					axisZB = Vector3.TransformNormal(localAxisZB, transformB);
+					axisZB.Normalize();
+					axisXB = Vector3.TransformNormal(localAxisXB, transformB);
+					axisXB.Normalize();
+					axisYB = Vector3.Cross(axisZB, axisXB);
+
+					hkpAngLimitConstraintAtom limit = limitedHingeConstraintData.m_atoms.m_angLimit;
+					Swing1LimitDegrees = (limit.m_maxAngle - limit.m_minAngle) * 0.5f;
+
+					float deltaAngle = limit.m_minAngle + Swing1LimitDegrees;
+					if (MathF.Abs(deltaAngle) > 0.000001f)
+					{
+						Microsoft.Xna.Framework.Quaternion rotate = Microsoft.Xna.Framework.Quaternion.CreateFromAxisAngle(axisZB, deltaAngle);
+						axisXB = Vector3.Transform(axisXB, rotate);
+						axisYB = Vector3.Transform(axisYB, rotate);
+					}
+
+					Swing2Motion = EAngularConstraintMotion.Locked;
+					TwistMotion = EAngularConstraintMotion.Locked;
+				}
+			}
+
+			int BodyAIndex = (int)(constraintInfo.m_bodyA.m_serialAndIndex & 0x00FFFFFF);
+			int BodyBIndex = (int)(constraintInfo.m_bodyB.m_serialAndIndex & 0x00FFFFFF);
+
+			System.Numerics.Quaternion mirror = System.Numerics.Quaternion.CreateFromAxisAngle(To(Vector3.UnitX), MathF.PI);
+
+			Constraint constraint = new Constraint();
+
+			constraint.Name = constraintInfo.m_name;
+
+			constraint.BoneAName = boneAName;
+			constraint.BoneBName = boneBName;
+
+			constraint.BodyAIndex = BodyAIndex;
+			constraint.BodyBIndex = BodyBIndex;
+
+			constraint.Pos1 = To(Vector3.Transform(translateA, mirror)) * To(UnitScale);
+			constraint.Pos2 = To(Vector3.Transform(translateB, mirror)) * To(UnitScale);
+
+			constraint.PriAxis1 = To(Vector3.Transform(axisXA, mirror));
+			constraint.PriAxis2 = To(Vector3.Transform(axisXB, mirror));
+											 
+			constraint.SecAxis1 = To(Vector3.Transform(axisYA, mirror));
+			constraint.SecAxis2 = To(Vector3.Transform(axisYB, mirror));
+
+			constraint.Swing1LimitDegrees = Swing1LimitDegrees / MathF.PI * 180;
+			constraint.Swing2LimitDegrees = Swing2LimitDegrees / MathF.PI * 180;
+			constraint.TwistLimitDegrees = TwistLimitDegrees / MathF.PI * 180;
+
+			constraint.Swing1Motion = Swing1Motion;
+			constraint.Swing2Motion = Swing2Motion;
+			constraint.TwistMotion = TwistMotion;
+
+			return constraint;
+		}
+
 		public Assimp.Scene CreateTestScene()
         {
             using(var context = new AssimpContext())
@@ -1572,6 +2153,8 @@ namespace DSAnimStudio
 			mainPart.flverPath = main.flverName;
 			mainPart.aniContainer = main.AnimContainer;
 			mainPart.taeContainer = Main.TAE_EDITOR.FileContainer;
+			mainPart.ragdollContainer = main.RagdollLevelContainer;
+			mainPart.ragdollPoseMatrices = main.RagdollPoseMatrices;
 
 			parts.Add(mainPart);
 
@@ -1635,6 +2218,8 @@ namespace DSAnimStudio
 				part.flver = flver;
 				part.flverPath = model.flverName;
 				part.aniContainer = model.AnimContainer;
+				part.ragdollContainer = model.RagdollLevelContainer;
+				part.ragdollPoseMatrices = model.RagdollPoseMatrices;
 
 				parts.Add(part);
 			}
@@ -1906,7 +2491,21 @@ namespace DSAnimStudio
 			return result;
 		}
 
+		System.Numerics.Vector3 To(Vector3 v)
+		{
+			System.Numerics.Vector3 result = new System.Numerics.Vector3(v.X, v.Y, v.Z);
+
+			return result;
+		}
+
 		System.Numerics.Quaternion To(Assimp.Quaternion q)
+		{
+			System.Numerics.Quaternion result = new System.Numerics.Quaternion(q.X, q.Y, q.Z, q.W);
+
+			return result;
+		}
+
+		System.Numerics.Quaternion To(Microsoft.Xna.Framework.Quaternion q)
 		{
 			System.Numerics.Quaternion result = new System.Numerics.Quaternion(q.X, q.Y, q.Z, q.W);
 
@@ -2039,6 +2638,105 @@ namespace DSAnimStudio
 			}
 
 			return path;
+		}
+
+		static T GetHavokObject<T>(hkRootLevelContainer container) where T : class
+		{
+			var element = container.m_namedVariants.Find(e => e.m_variant is T);
+			return element.m_variant as T;
+		}
+
+		static Vector3 GetColumn(ref Matrix m, int index)
+        {
+            if (index == 1)
+            {
+                return new Vector3(m.M21, m.M22, m.M23);
+            }
+			else if (index == 2)
+			{
+				return new Vector3(m.M31, m.M32, m.M33);
+			}
+            else
+            {
+                return new Vector3(m.M11, m.M12, m.M13);
+            }
+		}
+
+		static float Unpack(hknpHalf v)
+		{
+			int i = v.m_value << 16;
+			float r = BitConverter.ToSingle(BitConverter.GetBytes(i));
+			return r;
+		}
+
+		static System.Numerics.Vector4 Unpack(hkPackedVector3 v)
+		{
+			List<short> svalues = v.m_values;
+			List<int> ivalues = new List<int>(svalues.Count);
+
+			for (int i = 0; i < svalues.Count; ++i)
+			{
+				short svalue = svalues[i];
+				ivalues.Add((int)svalue << 16);
+			}
+
+			float exp = BitConverter.ToSingle(BitConverter.GetBytes(ivalues[3]));
+			System.Numerics.Vector4 result = new System.Numerics.Vector4((float)(ivalues[0]), (float)(ivalues[1]), (float)(ivalues[2]), (float)(ivalues[3]));
+			return result * exp;
+		}
+
+		static System.Numerics.Vector4 Unpack(List<short> v)
+		{
+			double HK_QUADREAL_UNPACK16_UNIT_VEC = 1.0 / (30000.0 * 0x10000);
+
+			int hkPackedUnitVector_m_offset;
+			unchecked
+			{
+				hkPackedUnitVector_m_offset = (int)0x80000000;
+			}
+
+			List<short> svalues = v;
+			List<int> ivalues = new List<int>(svalues.Count);
+
+			for(int i = 0; i < svalues.Count; ++i)
+			{
+				short svalue = svalues[i];
+				ivalues.Add(((int)svalue << 16) + hkPackedUnitVector_m_offset);
+			}
+
+			System.Numerics.Vector4 result = new System.Numerics.Vector4((float)(ivalues[0]), (float)(ivalues[1]), (float)(ivalues[2]), (float)(ivalues[3]));
+			return result * (float)HK_QUADREAL_UNPACK16_UNIT_VEC;
+		}
+
+		CombineMode ToCombineMode(CombinePolicy c)
+		{
+			CombineMode mode = CombineMode.Average;
+
+			switch (c)
+			{
+				case CombinePolicy.COMBINE_MIN:
+					mode = CombineMode.Min;
+					break;
+				case CombinePolicy.COMBINE_MAX:
+					mode = CombineMode.Max;
+					break;
+				case CombinePolicy.COMBINE_GEOMETRIC_MEAN:
+				case CombinePolicy.COMBINE_ARITHMETIC_MEAN:
+				default:
+					mode = CombineMode.Average;
+					break;
+			}
+
+			return mode;
+		}
+
+		public static bool Equal(PhysicsMaterial lhs, PhysicsMaterial rhs)
+		{
+			return lhs.DynamicFriction == rhs.DynamicFriction
+				&& lhs.StaticFriction == rhs.StaticFriction
+				&& lhs.Restitution == rhs.Restitution
+				&& lhs.FrictionCombineMode == rhs.FrictionCombineMode
+				&& lhs.RestitutionCombineMode == rhs.RestitutionCombineMode;
 		}
 
 		const string ExportFormatID = "fbxa";

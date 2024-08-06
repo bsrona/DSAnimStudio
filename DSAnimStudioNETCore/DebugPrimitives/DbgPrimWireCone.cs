@@ -17,6 +17,8 @@ namespace DSAnimStudio.DebugPrimitives
             else
                 perp = Vector3.Cross(axis, Vector3.UnitY);
 
+            perp.Normalize();
+
 			var start = Vector3.Transform(axis, Quaternion.CreateFromAxisAngle(perp, angle)) * height;
             var last = start;
 

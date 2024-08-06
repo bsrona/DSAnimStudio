@@ -16,9 +16,9 @@ namespace DSAnimStudio.DebugPrimitives
             var minAxis = Vector3.Transform(perp, Quaternion.CreateFromAxisAngle(axis, minAngle));
             var maxAxis = Vector3.Transform(perp, Quaternion.CreateFromAxisAngle(axis, maxAngle));
 
-			AddLine(Vector3.Zero, axis * radius, Color.Green);
+			AddLine(Vector3.Zero, axis * radius, Color.Blue);
 			AddLine(Vector3.Zero, perp * radius, Color.Red);
-            AddLine(Vector3.Zero, Vector3.Cross(perp, axis) * radius, Color.Blue);
+            AddLine(Vector3.Zero, Vector3.Cross(axis, perp) * radius, Color.Green);
             AddLine(Vector3.Zero, minAxis * radius, Color.Yellow);
             AddLine(Vector3.Zero, maxAxis * radius, Color.Yellow);
             AddLine(minAxis * radius, maxAxis * radius, Color.Yellow);
