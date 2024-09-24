@@ -75,7 +75,7 @@ namespace DSAnimStudio.TaeEditor
                 else
                 {
                     // Always clear for anything not a REMO, which is the only example of event groups actually having meanings.
-                    MainScreen.SelectedTaeAnim.EventGroups.Clear();
+                    MainScreen.SelectedTaeAnim?.EventGroups.Clear();
                     GroupRegions.Clear();
 
                     // Only generate if supported or if user has option enabled to force use these in games where they usually aren't.

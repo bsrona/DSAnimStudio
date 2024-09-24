@@ -29,6 +29,760 @@ using static DSAnimStudio.ToolExportUnrealEngine;
 using static SoulsAssetPipeline.Animation.TAE.EventGroup;
 using static SoulsAssetPipeline.Animation.TAE.Animation;
 using System.Data;
+using Behavior;
+using Havoc.Objects;
+
+namespace Behavior
+{
+	public class Variable
+	{
+		public string Name;
+		public VariableType Type;
+		public Role Role;
+		public short RoleFlags;
+	}
+
+	public class VariableBound
+	{
+		public int Min;
+		public int Max;
+	}
+
+	public class VariablesValues
+	{
+		public List<int> Values = new List<int>();
+		public List<System.Numerics.Vector4> VectorValues = new List<System.Numerics.Vector4>();
+		public List<hkReferencedObject> ObjectValues = new List<hkReferencedObject>();
+	}
+
+	public class Variables
+	{
+		public List<Variable> VariableInfos = new List<Variable>();
+		public VariablesValues Values = new VariablesValues();
+		public List<VariableBound> Bounds = new List<VariableBound>();
+
+		public static Variables Create(List<string> names, List<hkbVariableInfo> infos, hkbVariableValueSet hkValues, List<hkbVariableBounds> hkBounds = null)
+		{
+			List<Variable> variables = new List<Variable>();
+
+			if (infos != null)
+			{
+				for (int i = 0; i < infos.Count; ++i)
+				{
+					hkbVariableInfo characterPropertyInfo = infos[i];
+
+					Variable variable = new Variable();
+
+					variable.Name = names[i];
+					variable.Type = characterPropertyInfo.m_type;
+					variable.Role = characterPropertyInfo.m_role.m_role;
+					variable.RoleFlags = characterPropertyInfo.m_role.m_flags;
+
+					variables.Add(variable);
+				}
+			}
+
+			VariablesValues values = new VariablesValues();
+			if (hkValues != null)
+			{
+				List<int> baseValues = new List<int>();
+
+				List<hkbVariableValue> hkbValues = hkValues.m_wordVariableValues;
+				if (hkbValues != null)
+				{
+					for (int i = 0; i < hkbValues.Count; ++i)
+					{
+						hkbVariableValue hkValue = hkbValues[i];
+						baseValues.Add(hkValue.m_value);
+					}
+				}
+				values.Values = baseValues;
+				values.VectorValues = hkValues.m_quadVariableValues?.ToList<System.Numerics.Vector4>();
+				values.VectorValues ??= new List<System.Numerics.Vector4>();
+				values.ObjectValues = hkValues.m_variantVariableValues ?? new List<hkReferencedObject>();
+			}
+
+			List<VariableBound> bounds = new List<VariableBound>();
+			if (hkBounds != null)
+			{
+				for (int i = 0; i < bounds.Count; ++i)
+				{
+					hkbVariableBounds hkBound = hkBounds[i];
+
+					VariableBound bound = new VariableBound();
+					bound.Min = hkBound.m_min.m_value;
+					bound.Max = hkBound.m_max.m_value;
+					bounds.Add(bound);
+				}
+			}
+
+			Variables result = new Variables();
+
+			result.VariableInfos = variables;
+			result.Values = values;
+			result.Bounds = bounds;
+
+			return result;
+		}
+	}
+
+	public class Bind
+	{
+		public string MemberPath;
+		public int VariableIndex;
+		public sbyte BitIndex;
+		public BindingType BindingType;
+		public int OffsetInObjectPlusOne;
+		public int OffsetInArrayPlusOne;
+		public int RootVariableIndex;
+		public sbyte VariableType;
+		public sbyte Flags;
+
+		public static Bind CreateBind(hkbVariableBindingSetBinding hkBind)
+		{
+			Bind bind = new Bind();
+
+			bind.MemberPath = hkBind.m_memberPath;
+			bind.VariableIndex = hkBind.m_variableIndex;
+			bind.BitIndex = hkBind.m_bitIndex;
+			bind.BindingType = hkBind.m_bindingType;
+			bind.OffsetInObjectPlusOne = hkBind.m_offsetInObjectPlusOne;
+			bind.OffsetInArrayPlusOne = hkBind.m_offsetInObjectPlusOne;
+			bind.RootVariableIndex = hkBind.m_rootVariableIndex;
+			bind.VariableType = hkBind.m_variableType;
+			bind.Flags = hkBind.m_flags;
+
+			return bind;
+		}
+	}
+
+	public class Binds
+	{
+		public List<Bind> Bindings;
+		public int IndexOfBindingToEnable;
+		public bool HasOutputBinding;
+		public bool InitializedOffsets;
+
+		public static Binds CreateBinds(hkbVariableBindingSet hkBinds)
+		{
+			if (hkBinds == null)
+				return null;
+
+			List<Bind> bindings = new List<Bind>();
+
+			List<hkbVariableBindingSetBinding> hkBindSets = hkBinds.m_bindings;
+			for (int i = 0; i < hkBindSets.Count; i++)
+			{
+				hkbVariableBindingSetBinding hkBindSet = hkBindSets[i];
+				Bind bind = Bind.CreateBind(hkBindSet);
+				bindings.Add(bind);
+			}
+
+			Binds binds = new Binds();
+			binds.Bindings = bindings;
+			binds.IndexOfBindingToEnable = hkBinds.m_indexOfBindingToEnable;
+			binds.HasOutputBinding = hkBinds.m_hasOutputBinding;
+			binds.InitializedOffsets = hkBinds.m_initializedOffsets;
+			return binds;
+		}
+	}
+
+	public class Project
+	{
+		public List<string> CharacterFiles;
+		public List<string> BehaviorFiles;
+		public string SourceFile;
+		public string ScriptPath;
+		public System.Numerics.Vector4 Up;
+
+		public static Project Create(hkbProjectData hkProjectData)
+		{
+			hkbProjectStringData hkStringData = hkProjectData.m_stringData;
+
+			Project project = new Project();
+
+			project.Up = hkProjectData.m_worldUpWS;
+			project.CharacterFiles = hkStringData.m_characterFilenames;
+			project.BehaviorFiles = hkStringData.m_behaviorFilenames;
+			project.SourceFile = hkStringData.m_fullPathToSource;
+			project.ScriptPath = hkStringData.m_scriptsPath;
+
+			return project;
+		}
+	}
+
+	public class Character
+	{
+		public Vector4 AxisUp;
+		public Vector4 AxisForward;
+		public Vector4 AxisRight;
+
+		public float Scale;
+
+		public string Rig;
+		public string Ragdoll;
+		public string Behavior;
+
+		public List<string> LuaFiles;
+
+		public Variables Properties;
+
+		public static Character Create(hkbCharacterData hkCharacterData)
+		{
+			hkbCharacterStringData hkStringData = hkCharacterData.m_stringData;
+			List<hkbVariableInfo> propertyInfos = hkCharacterData.m_characterPropertyInfos;
+			hkbVariableValueSet propertyValues = hkCharacterData.m_characterPropertyValues;
+
+			Variables variables = Variables.Create(hkStringData.m_characterPropertyNames, propertyInfos, propertyValues);
+
+			Character character = new Character();
+
+			character.AxisUp = hkCharacterData.m_modelUpMS;
+			character.AxisForward = hkCharacterData.m_modelForwardMS;
+			character.AxisRight = hkCharacterData.m_modelRightMS;
+
+			character.Scale = hkCharacterData.m_scale;
+
+			character.Rig = hkStringData.m_rigName;
+			character.Ragdoll = hkStringData.m_ragdollName;
+			character.Behavior = hkStringData.m_behaviorFilename;
+
+			character.LuaFiles = hkStringData.m_luaFiles;
+
+			character.Properties = variables;
+
+			return character;
+		}
+	}
+
+	public class Bindable
+	{
+		public string _ClassName;
+		public Binds Binds;
+
+		public static Bindable Create(hkbBindable hkBindable)
+		{
+			Bindable bindable = null;
+
+			Constructors.TryGetValue(hkBindable.GetType(), out ConstructorInfo Constructor);
+			if (Constructor != null)
+			{
+				bindable = Constructor?.Invoke(null) as Bindable;
+				bindable.From(hkBindable);
+			}
+
+			if (bindable == null)
+				bindable = null;
+
+			return bindable;
+		}
+
+		public static T Create<T>(hkbBindable hkBindable) where T : Bindable
+		{
+			return Create(hkBindable) as T;
+		}
+
+		public static List<T> Creates<HKT, T>(List<HKT> hkBindables) where T : Bindable where HKT : hkbBindable
+		{
+			List<T> bindables = new List<T>();
+
+			for (int i = 0; i < hkBindables.Count; ++i)
+			{
+				HKT hkBindable = hkBindables[i];
+				T bindable = Create(hkBindable) as T;
+				bindables.Add(bindable);
+			}
+
+			return bindables;
+		}
+
+		public virtual void From(hkbBindable hkBindable)
+		{
+			_ClassName = "Beh" + GetType().Name;
+			Binds = Binds.CreateBinds(hkBindable.m_variableBindingSet);
+		}
+
+		static Bindable()
+		{
+			Type thisType = typeof(Bindable);
+			Type[] subTypes = thisType.Assembly.GetTypes().Where(t => t.IsSubclassOf(thisType)).ToArray();
+			for (int i = 0; i < subTypes.Length; ++i)
+			{
+				Type subType = subTypes[i];
+				System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(subType.TypeHandle);
+			}
+		}
+
+		protected static void Register<HKT, T>()
+		{
+			Constructors.Add(typeof(HKT), typeof(T).GetConstructor(Arguments));
+		}
+
+		static Dictionary<Type, ConstructorInfo> Constructors = new Dictionary<Type, ConstructorInfo>();
+		static Type[] Arguments = new Type[0];
+	}
+
+	public class Node : Bindable
+	{
+		public string Name;
+
+		public static Node Create(hkbNode hkNode)
+		{
+			var result = Bindable.Create(hkNode) as Node;
+			return result;
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkNode = hkBindable as hkbNode;
+
+			Name = hkNode.m_name;
+		}
+	}
+
+	public class Generator : Node
+	{
+		public static Generator Create(hkbGenerator hkNode)
+		{
+			var result = Node.Create(hkNode) as Generator;
+			return result;
+		}
+	}
+
+	public class Modifier : Node
+	{
+		public bool Enable;
+
+		public static Modifier Create(hkbModifier hkNode)
+		{
+			var result = Node.Create(hkNode) as Modifier;
+			return result;
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			hkbModifier hkModifier = hkBindable as hkbModifier;
+
+			Enable = hkModifier.m_enable;
+		}
+	}
+
+	public class Event
+	{
+		public string Name;
+		public uint Flags;
+	}
+
+	public class Graph : Generator
+	{
+		public List<string> Animations;
+		public Variables Variables;
+		public Variables CharacterProperties;
+		public List<Event> Events;
+		public Generator Generator;
+
+		static Graph()
+		{
+			Register<hkbBehaviorGraph, Graph>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			hkbBehaviorGraph hkBehaviorGraph = hkBindable as hkbBehaviorGraph;
+
+			hkbBehaviorGraphData graphData = hkBehaviorGraph.m_data;
+			hkbBehaviorGraphStringData stringData = graphData.m_stringData;
+			List<hkbVariableInfo> variableInfos = graphData.m_variableInfos;
+			hkbVariableValueSet variableValues = graphData.m_variableInitialValues;
+			List<hkbVariableBounds> virableValueBounds = graphData.m_variableBounds;
+			List<hkbEventInfo> eventInfos = graphData.m_eventInfos;
+
+			List<string> animations = stringData.m_animationNames ?? new List<string>();
+
+			Variables variables = Variables.Create(stringData.m_variableNames, variableInfos, variableValues, virableValueBounds);
+			Variables properties = Variables.Create(stringData.m_characterPropertyNames, graphData.m_characterPropertyInfos, null);
+
+			List<Event> events = new List<Event>();
+			if (eventInfos != null)
+			{
+				for (int i = 0; i < eventInfos.Count; ++i)
+				{
+					hkbEventInfo hkEventInfo = eventInfos[i];
+					Event behaviorEvent = new Event();
+					behaviorEvent.Name = stringData.m_eventNames[i];
+					behaviorEvent.Flags = hkEventInfo.m_flags;
+					events.Add(behaviorEvent);
+				}
+			}
+
+			Generator generator = Create(hkBehaviorGraph.m_rootGenerator);
+
+			Animations = animations;
+			Variables = variables;
+			CharacterProperties = properties;
+			Events = events;
+			Generator = generator;
+		}
+	}
+
+	public class StateMachine : Generator
+	{
+		public class State : Bindable
+		{
+			public string Name;
+			public Generator Generator;
+
+			static State()
+			{
+				Register<hkbStateMachineStateInfo, State>();
+			}
+
+			public override void From(hkbBindable hkBindable)
+			{
+				base.From(hkBindable);
+
+				var hkState = hkBindable as hkbStateMachineStateInfo;
+
+				Name = hkState.m_name;
+				Generator = Generator.Create(hkState.m_generator);
+			}
+		}
+
+		public class Transition
+		{
+				
+		}
+
+		public List<State> States = new List<State>();
+		public List<Transition> Transitions = new List<Transition>();
+
+		static StateMachine()
+		{
+			Register<hkbStateMachine, StateMachine>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			hkbStateMachine hkStateMachine = hkBindable as hkbStateMachine;
+
+			List<State> states = Creates<hkbStateMachineStateInfo, State>(hkStateMachine.m_states);
+
+			States = states;
+		}
+	}
+
+	public class ReferenceGenerator : Generator
+	{
+		public string BehaviorName;
+
+		static ReferenceGenerator()
+		{
+			Register<hkbBehaviorReferenceGenerator, ReferenceGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbBehaviorReferenceGenerator;
+
+			BehaviorName = hkGenerator.m_behaviorName;
+		}
+	}
+
+	public class LayerGenerator : Generator
+	{
+		public class Layer : Bindable
+		{
+			public Generator Generator;
+
+			static Layer()
+			{
+				Register<hkbLayer, Layer>();
+			}
+
+			public override void From(hkbBindable hkBindable)
+			{
+				base.From(hkBindable);
+
+				var hkLayer = hkBindable as hkbLayer;
+
+				Generator = Generator.Create(hkLayer.m_generator);
+			}
+		}
+
+		public List<Layer> Layers;
+		public short IndexOfSyncMasterChild;
+		public ushort Flags;
+		public int NumActiveLayers;
+		public bool InitSync;
+
+		static LayerGenerator()
+		{
+			Register<hkbLayerGenerator, LayerGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbLayerGenerator;
+
+			List<Layer> layers = Creates<hkbLayer, Layer>(hkGenerator.m_layers);
+
+			Layers = layers;
+			IndexOfSyncMasterChild = hkGenerator.m_indexOfSyncMasterChild;
+			Flags = hkGenerator.m_flags;
+			NumActiveLayers = hkGenerator.m_numActiveLayers;
+			InitSync = hkGenerator.m_initSync;
+		}
+	}
+
+	public class BlenderGenerator : Generator
+	{
+		public class Child : Bindable
+		{
+			public Generator Generator;
+
+			static Child()
+			{
+				Register<hkbBlenderGeneratorChild, Child>();
+			}
+
+			public override void From(hkbBindable hkBindable)
+			{
+				base.From(hkBindable);
+
+				var hkChild = hkBindable as hkbBlenderGeneratorChild;
+
+				Generator = Generator.Create(hkChild.m_generator);
+			}
+		}
+
+		public List<Child> Children;
+
+		static BlenderGenerator()
+		{
+			Register<hkbBlenderGenerator, BlenderGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbBlenderGenerator;
+
+			List<Child> children = Creates<hkbBlenderGeneratorChild, Child>(hkGenerator.m_children);
+
+			Children = children;
+		}
+	}
+
+	public class ModifierGenerator : Generator
+	{
+		public Modifier Modifier;
+		public Generator Generator;
+
+		static ModifierGenerator()
+		{
+			Register<hkbModifierGenerator, ModifierGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbModifierGenerator;
+
+			Modifier = Modifier.Create(hkGenerator.m_modifier);
+			Generator = Create(hkGenerator.m_generator);
+		}
+	}
+
+	public class ScriptGenerator : Generator
+	{
+		public Generator Generator;
+
+		static ScriptGenerator()
+		{
+			Register<hkbScriptGenerator, ScriptGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbScriptGenerator;
+
+			Generator = Create(hkGenerator.m_child);
+		}
+	}
+
+	public class ManualSelectorGenerator : Generator
+	{
+		public List<Generator> Generators;
+
+		static ManualSelectorGenerator()
+		{
+			Register<hkbManualSelectorGenerator, ManualSelectorGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbManualSelectorGenerator;
+
+			List<Generator> generators = Creates<hkbGenerator, Generator>(hkGenerator.m_generators);
+
+			Generators = generators;
+		}
+	}
+
+	public class CustomManualSelectorGenerator : Generator
+	{
+		public List<Generator> Generators;
+
+		static CustomManualSelectorGenerator()
+		{
+			Register<HKX2.CustomManualSelectorGenerator, CustomManualSelectorGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as HKX2.CustomManualSelectorGenerator;
+
+			List<Generator> generators = Creates<hkbGenerator, Generator>(hkGenerator.m_generators);
+
+			Generators = generators;
+		}
+	}
+
+	public class ClipGenerator : Generator
+	{
+		public string AnimationName;
+
+		static ClipGenerator()
+		{
+			Register<hkbClipGenerator, ClipGenerator>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkGenerator = hkBindable as hkbClipGenerator;
+
+			AnimationName = hkGenerator.m_animationName;
+		}
+	}
+
+	public class ModifierList : Modifier
+	{
+		public List<Modifier> Modifiers;
+
+		static ModifierList()
+		{
+			Register<hkbModifierList, ModifierList>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as hkbModifierList;
+
+			List<Modifier> modifiers = Creates<hkbModifier, Modifier>(hkObject.m_modifiers);
+
+			Modifiers = modifiers;
+		}
+	}
+
+	public class FootIkControlsModifier : Modifier
+	{
+		static FootIkControlsModifier()
+		{
+			Register<hkbFootIkControlsModifier, FootIkControlsModifier>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as hkbFootIkControlsModifier;
+		}
+	}
+
+	public class GetHandleOnBoneModifier : Modifier
+	{
+		static GetHandleOnBoneModifier()
+		{
+			Register<hkbGetHandleOnBoneModifier, GetHandleOnBoneModifier>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as hkbGetHandleOnBoneModifier;
+		}
+	}
+
+	public class HandIkControlsModifier : Modifier
+	{
+		static HandIkControlsModifier()
+		{
+			Register<hkbHandIkControlsModifier, HandIkControlsModifier>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as hkbHandIkControlsModifier;
+		}
+	}
+
+	public class KeyframeBonesModifier : Modifier
+	{
+		static KeyframeBonesModifier()
+		{
+			Register<hkbKeyframeBonesModifier, HandIkControlsModifier>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as hkbKeyframeBonesModifier;
+		}
+	}
+
+	public class CustomLookAtTwistModifier : Modifier
+	{
+		static CustomLookAtTwistModifier()
+		{
+			Register<HKX2.CustomLookAtTwistModifier, CustomLookAtTwistModifier>();
+		}
+
+		public override void From(hkbBindable hkBindable)
+		{
+			base.From(hkBindable);
+
+			var hkObject = hkBindable as HKX2.CustomLookAtTwistModifier;
+		}
+	}
+}
 
 namespace DSAnimStudio
 {
@@ -46,6 +800,7 @@ namespace DSAnimStudio
             AnimationSequence_Fbx,
 			AnimationSequences_Fbx,
 			Taes_Json,
+			Behavior_Json,
 		}
 
 		HavokSplineFixer splineFixer = null;
@@ -68,6 +823,7 @@ namespace DSAnimStudio
 			public TaeFileContainer taeContainer;
 			public hkRootLevelContainer ragdollContainer;
 			public Matrix[] ragdollPoseMatrices;
+			public IBinder behbnd;
 		}
 
 		public struct PartFile
@@ -77,6 +833,7 @@ namespace DSAnimStudio
 			public string PhysicsAsset;
 			public List<string> Animations;
 			public List<string> Taes;
+			public List<string> Behaviors;
 			public List<string> Materials;
 			public List<string> Mtds;
 			public List<string> Textures;
@@ -278,9 +1035,13 @@ namespace DSAnimStudio
 				{
 					ExportAnimations(path);
 				}
-				else if(fileType == ExportFileType.Taes_Json)
+				else if (fileType == ExportFileType.Taes_Json)
 				{
 					ExportTaes(path);
+				}
+				else if (fileType == ExportFileType.Behavior_Json)
+				{
+					ExportBehaviors(path);
 				}
 			}
 			catch (Exception ex)
@@ -309,6 +1070,7 @@ namespace DSAnimStudio
 				partFile.PhysicsAsset = ExportPhysicsAsset(path, part);
 				partFile.Animations = ExportAnimations(path, part);
 				partFile.Taes = ExportTaes(path, part);
+				partFile.Behaviors = ExportBehaviors(path, part);
 				partFile.Mesh = ExportSkeletalMesh(path, part);
 
 				var json = Newtonsoft.Json.JsonConvert.SerializeObject(partFile, Newtonsoft.Json.Formatting.Indented);
@@ -350,6 +1112,18 @@ namespace DSAnimStudio
 				Part part = parts[i];
 
 				ExportTaes(path, part);
+			}
+		}
+
+		public void ExportBehaviors(string path)
+		{
+			List<Part> parts = GetParts();
+
+			for(int i = 0; i < parts.Count; ++i)
+			{
+				Part part = parts[i];
+
+				ExportBehaviors(path, part);
 			}
 		}
 
@@ -593,6 +1367,36 @@ namespace DSAnimStudio
 			return taePaths;
 		}
 
+		public List<string> ExportBehaviors(string path, Part part)
+		{
+			List<string> behaviorPaths = new List<string>();
+
+			IBinder behbnd = part.behbnd;
+			if (behbnd == null)
+				return behaviorPaths;
+
+			for (int i = 0; i < behbnd.Files.Count; ++i)
+			{
+				BinderFile benFile = behbnd.Files[i];
+				string originalPath = benFile.Name;
+				string relativePath = ToRelativePath(originalPath);
+				string fullPath = path + relativePath;
+
+				hkRootLevelContainer container = HKX.Load(benFile.Bytes) as hkRootLevelContainer;
+				if (container == null)
+					continue;
+
+				fullPath = ExportBehavior(fullPath, container);
+
+				if (fullPath == null)
+					continue;
+
+				behaviorPaths.Add(fullPath);
+			}
+
+			return behaviorPaths;
+		}
+
 		public string ExportSkeleton(string path, Part part)
 		{
 			NewAnimationContainer animationContainer = part.aniContainer;
@@ -739,6 +1543,46 @@ namespace DSAnimStudio
 			}
 
 			return texturePaths;
+		}
+
+		public string ExportBehavior(string path, hkRootLevelContainer container)
+		{
+			hkbProjectData hkProjectData = GetHavokObject<hkbProjectData>(container);
+			hkbCharacterData hkCharacterData = GetHavokObject<hkbCharacterData>(container);
+			hkbBehaviorGraph hkBehaviorGraph = GetHavokObject<hkbBehaviorGraph>(container);
+
+			string extension = null;
+			object behaviorObject = null;
+
+			if (hkProjectData != null)
+			{
+				extension = "hkp";
+
+				behaviorObject = CreateBehaviorProject(hkProjectData);
+			}
+			else if (hkCharacterData != null)
+			{
+				extension = "hkc";
+
+				behaviorObject = CreateBehaviorCharacter(hkCharacterData);
+			}
+			else if (hkBehaviorGraph != null)
+			{
+				extension = "hkb";
+
+				behaviorObject = CreateBehaviorGraph(hkBehaviorGraph);
+			}
+
+			if (behaviorObject == null)
+				return null;
+
+			var json = Newtonsoft.Json.JsonConvert.SerializeObject(behaviorObject, Newtonsoft.Json.Formatting.Indented);
+
+			path = Path.ChangeExtension(path, extension);
+
+			WriteTextFile(json, path);
+
+			return path;
 		}
 
 		public bool ExportAnimation(NewAnimationContainer animContainer, string name, string path)
@@ -1002,9 +1846,9 @@ namespace DSAnimStudio
 
 		public Assimp.Scene CreateScene(FLVER2 flver, string relativeToRoot)
 		{
-			Node root = new Node("RootNode");
+			Assimp.Node root = new Assimp.Node("RootNode");
 
-			List<Node> boneNodes = CreateBoneNodes(flver, root);
+			List<Assimp.Node> boneNodes = CreateBoneNodes(flver, root);
 			List<Material> materials = CreateMaterials(flver, relativeToRoot);
 			List<Mesh> meshes = CreateMeshes(flver, boneNodes);
 
@@ -1015,8 +1859,8 @@ namespace DSAnimStudio
 					Mesh mesh = meshes[i];
 					FLVER2.Mesh flverMesh = flver.Meshes[i];
 
-					Node parentNode = boneNodes[flverMesh.DefaultBoneIndex];
-					Node meshNode = new Node(mesh.Name);
+					Assimp.Node parentNode = boneNodes[flverMesh.DefaultBoneIndex];
+					Assimp.Node meshNode = new Assimp.Node(mesh.Name);
 
 					meshNode.MeshIndices.Add(i);
 					meshNode.Parent = parentNode;
@@ -1038,10 +1882,10 @@ namespace DSAnimStudio
 
 		public Assimp.Scene CreateScene(NewAnimationContainer animContainer)
 		{
-			Node root = new Node("RootNode");
+			Assimp.Node root = new Assimp.Node("RootNode");
 
 			HKX.HKASkeleton skeleton = animContainer.Skeleton.OriginalHavokSkeleton;
-			List<Node> boneNodes = CreateBoneNodes(skeleton, root);
+			List<Assimp.Node> boneNodes = CreateBoneNodes(skeleton, root);
 
 			Assimp.Scene scene = new Assimp.Scene();
 
@@ -1064,28 +1908,28 @@ namespace DSAnimStudio
 			return scene;
 		}
 
-		List<Node> CreateBoneNodes(FLVER2 flver, Node root)
+		List<Assimp.Node> CreateBoneNodes(FLVER2 flver, Assimp.Node root)
 		{
 			List<FLVER.Bone> bones = flver.Bones;
 
-			List<Node> nodes = new List<Node>(bones.Count);
+			List<Assimp.Node> nodes = new List<Assimp.Node>(bones.Count);
 			for (int i = 0; i < bones.Count; ++i)
 			{
 				FLVER.Bone bone = bones[i];
-				Node node = CreateBoneNode(bone);
+				Assimp.Node node = CreateBoneNode(bone);
 				nodes.Add(node);
 			}
 
 			for (int i = 0; i < bones.Count; ++i)
 			{
 				FLVER.Bone bone = bones[i];
-				Node parent = root;
+				Assimp.Node parent = root;
 
 				int parentIndex = bone.ParentIndex;
 				if (parentIndex >= 0)
 					parent = nodes[parentIndex];
 
-				Node node = nodes[i];
+				Assimp.Node node = nodes[i];
 				node.Parent = parent;
 				if (parent != null)
 					parent.Children.Add(node);
@@ -1094,31 +1938,31 @@ namespace DSAnimStudio
 			return nodes;
 		}
 
-		List<Node> CreateBoneNodes(HKASkeleton skeleton, Node root)
+		List<Assimp.Node> CreateBoneNodes(HKASkeleton skeleton, Assimp.Node root)
 		{
 			HKArray<HKX.Bone> bones = skeleton.Bones;
 			HKArray<HKX.Transform> transforms = skeleton.Transforms;
 
 			int count = (int)bones.Size;
-			List<Node> nodes = new List<Node>(count);
+			List<Assimp.Node> nodes = new List<Assimp.Node>(count);
 			for(int i = 0; i < count; ++i)
 			{
 				HKX.Bone bone = bones[i];
 				HKX.Transform transform = transforms[i];
-				Node node = CreateBoneNode(bone, transform);
+				Assimp.Node node = CreateBoneNode(bone, transform);
 				nodes.Add(node);
 			}
 
 			HKArray<HKShort> parentIndices = skeleton.ParentIndices;
 			for (int i = 0; i < count; ++i)
 			{
-				Node parent = root;
+				Assimp.Node parent = root;
 
 				int parentIndex = parentIndices[i].data;
 				if (parentIndex >= 0)
 					parent = nodes[parentIndex];
 
-				Node node = nodes[i];
+				Assimp.Node node = nodes[i];
 				node.Parent = parent;
 
 				if (parent != null)
@@ -1128,7 +1972,7 @@ namespace DSAnimStudio
 			return nodes;
 		}
 
-		Node CreateBoneNode(FLVER.Bone bone)
+		Assimp.Node CreateBoneNode(FLVER.Bone bone)
 		{
 			System.Numerics.Vector3 scale = bone.Scale;
 			System.Numerics.Vector3 rotation = bone.Rotation;
@@ -1144,12 +1988,12 @@ namespace DSAnimStudio
 				* System.Numerics.Matrix4x4.CreateTranslation(translation);
 
 
-			Node node = CreateNode(bone.Name, transform);
+			Assimp.Node node = CreateNode(bone.Name, transform);
 
 			return node;
 		}
 
-		Node CreateBoneNode(HKX.Bone bone, HKX.Transform t)
+		Assimp.Node CreateBoneNode(HKX.Bone bone, HKX.Transform t)
 		{
 			System.Numerics.Vector3 scale = new System.Numerics.Vector3(t.Scale.Vector.X, t.Scale.Vector.Y, t.Scale.Vector.Z);
 			System.Numerics.Quaternion rotation = new System.Numerics.Quaternion(t.Rotation.Vector.X, t.Rotation.Vector.Y, t.Rotation.Vector.Z, t.Rotation.Vector.W);
@@ -1162,14 +2006,14 @@ namespace DSAnimStudio
 				* System.Numerics.Matrix4x4.CreateFromQuaternion(rotation)
 				* System.Numerics.Matrix4x4.CreateTranslation(translation);
 
-			Node node = CreateNode(bone.Name.GetString(), transform);
+			Assimp.Node node = CreateNode(bone.Name.GetString(), transform);
 
 			return node;
 		}
 
-		Node CreateNode(string name, System.Numerics.Matrix4x4 transform)
+		Assimp.Node CreateNode(string name, System.Numerics.Matrix4x4 transform)
 		{
-			Node node = new Node();
+			Assimp.Node node = new Assimp.Node();
 
 			node.Name = name;
 			node.Transform = From(transform);
@@ -1279,13 +2123,13 @@ namespace DSAnimStudio
 			return materials;
 		}
 
-		List<Assimp.Bone> CreateBones(List<Node> nodes)
+		List<Assimp.Bone> CreateBones(List<Assimp.Node> nodes)
 		{
 			List<Assimp.Bone> bones = new List<Assimp.Bone>(nodes.Count);
 
 			for (int i = 0; i < nodes.Count; ++i)
 			{
-				Node node = nodes[i];
+				Assimp.Node node = nodes[i];
 
 				Assimp.Bone bone = new Assimp.Bone();
 				bone.Name = node.Name;
@@ -1298,7 +2142,7 @@ namespace DSAnimStudio
 		}
 
 
-		List<Mesh> CreateMeshes(FLVER2 flver, List<Node> boneNodes)
+		List<Mesh> CreateMeshes(FLVER2 flver, List<Assimp.Node> boneNodes)
 		{
 			List<FLVER2.Mesh> flverMeshes = flver.Meshes;
 			List<FLVER2.Material> flverMaterials = flver.Materials;
@@ -1540,19 +2384,19 @@ namespace DSAnimStudio
 
 		void AddDummySkin(Assimp.Scene scene)
 		{
-			Node master = scene.RootNode.FindNode("Master");
+			Assimp.Node master = scene.RootNode.FindNode("Master");
 			if (master == null)
 				return;
 
-			List<Node> boneNodes = new List<Node>();
-			Queue<Node> queue = new Queue<Node>();
+			List<Assimp.Node> boneNodes = new List<Assimp.Node>();
+			Queue<Assimp.Node> queue = new Queue<Assimp.Node>();
 			queue.Enqueue(master);
 			while (queue.Count > 0)
 			{
-				Node node = queue.Dequeue();
+				Assimp.Node node = queue.Dequeue();
 				for (int i = 0; i < node.ChildCount; ++i)
 				{
-					Node child = node.Children[i];
+					Assimp.Node child = node.Children[i];
 					queue.Enqueue(child);
 				}
 				boneNodes.Add(node);
@@ -1561,9 +2405,9 @@ namespace DSAnimStudio
 			AddDummySkin(scene, boneNodes);
 		}
 
-		void AddDummySkin(Assimp.Scene scene, List<Node> boneNodes)
+		void AddDummySkin(Assimp.Scene scene, List<Assimp.Node> boneNodes)
 		{
-			Node node = new Node("DummySkin");
+			Assimp.Node node = new Assimp.Node("DummySkin");
 			node.Parent = scene.RootNode;
 			node.Parent.Children.Add(node);
 
@@ -1579,7 +2423,7 @@ namespace DSAnimStudio
 			}
 		}
 
-		Mesh CreateDummySkin(List<Node> boneNodes)
+		Mesh CreateDummySkin(List<Assimp.Node> boneNodes)
 		{
 			BoundingBox aabb = CalculateAABB(boneNodes);
 
@@ -2065,13 +2909,37 @@ namespace DSAnimStudio
 			return constraint;
 		}
 
+		Project CreateBehaviorProject(hkbProjectData hkProjectData)
+		{
+			var project = Project.Create(hkProjectData);
+
+			project.SourceFile = ToRelativePath(project.SourceFile);
+			project.ScriptPath = ToRelativePath(project.ScriptPath);
+
+			return project;
+		}
+
+		Character CreateBehaviorCharacter(hkbCharacterData hkCharacterData)
+		{
+			var character = Character.Create(hkCharacterData);
+
+			return character;
+		}
+
+		Graph CreateBehaviorGraph(hkbBehaviorGraph hkBehaviorGraph)
+		{
+			var graph = Graph.Create<Graph>(hkBehaviorGraph);
+
+			return graph;
+		}
+
 		public Assimp.Scene CreateTestScene()
         {
             using(var context = new AssimpContext())
             {
 				Assimp.Scene testScene = context.ImportFile("C:\\Users\\chypy\\Documents\\3dsMax\\export\\test.FBX");
 				List<Mesh> testMeshes = testScene.Meshes;
-				Node rootNode = testScene.RootNode;
+				Assimp.Node rootNode = testScene.RootNode;
 				return testScene;
 			}
 			
@@ -2128,7 +2996,7 @@ namespace DSAnimStudio
 			mesh.Faces = faces;
 			mesh.MaterialIndex = 0;
 
-			Node node = new Node("Node");
+			Assimp.Node node = new Assimp.Node("Node");
 			node.MeshIndices.Add(0);
 
 			Assimp.Scene scene = new Assimp.Scene();
@@ -2155,6 +3023,7 @@ namespace DSAnimStudio
 			mainPart.taeContainer = Main.TAE_EDITOR.FileContainer;
 			mainPart.ragdollContainer = main.RagdollLevelContainer;
 			mainPart.ragdollPoseMatrices = main.RagdollPoseMatrices;
+			mainPart.behbnd = main.behaviorBinder;
 
 			parts.Add(mainPart);
 
@@ -2220,6 +3089,7 @@ namespace DSAnimStudio
 				part.aniContainer = model.AnimContainer;
 				part.ragdollContainer = model.RagdollLevelContainer;
 				part.ragdollPoseMatrices = model.RagdollPoseMatrices;
+				part.behbnd = model.behaviorBinder;
 
 				parts.Add(part);
 			}
@@ -2446,16 +3316,16 @@ namespace DSAnimStudio
 			return result;
 		}
 
-		BoundingBox CalculateAABB(List<Node> boneNodes)
+		BoundingBox CalculateAABB(List<Assimp.Node> boneNodes)
 		{
 			List<Vector3> positions = new List<Vector3>(boneNodes.Count);
 			
 			for (int i = 0; i < boneNodes.Count; ++i)
 			{
-				Node node = boneNodes[i];
+				Assimp.Node node = boneNodes[i];
 				Matrix4x4 transform = node.Transform;
 
-				Node parent = node.Parent;
+				Assimp.Node parent = node.Parent;
 				while (parent != null && boneNodes.Contains(parent))
 				{
 					transform = transform * parent.Transform;
@@ -2643,7 +3513,7 @@ namespace DSAnimStudio
 		static T GetHavokObject<T>(hkRootLevelContainer container) where T : class
 		{
 			var element = container.m_namedVariants.Find(e => e.m_variant is T);
-			return element.m_variant as T;
+			return element?.m_variant as T;
 		}
 
 		static Vector3 GetColumn(ref Matrix m, int index)

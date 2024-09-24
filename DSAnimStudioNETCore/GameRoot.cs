@@ -905,6 +905,7 @@ namespace DSAnimStudio
                         IBinder texbnd = null;
                         IBinder extraTexbnd = null;
                         IBinder anibnd = null;
+                        IBinder behbnd = null;
 
                         if (GameData.FileExists($@"/chr/{chrbndID}.texbnd.dcx"))
                             texbnd = ReadBinder(GameData.ReadFile($@"/chr/{chrbndID}.texbnd.dcx"));
@@ -932,7 +933,8 @@ namespace DSAnimStudio
                         if (GameData.FileExists($@"/chr/{anibndID}.anibnd.dcx"))
                             anibnd = ReadBinder(GameData.ReadFile($@"/chr/{anibndID}.anibnd.dcx"));
                         
-
+                        if (GameData.FileExists($@"/chr/{anibndID}.behbnd.dcx"))
+							behbnd = ReadBinder(GameData.ReadFile($@"/chr/{anibndID}.behbnd.dcx"));
                        
 
                         if ((anibnd == null || !anibnd.Files.Any(f => f.Name.ToLower().EndsWith(".tae"))) && GameData.FileExists($@"/chr/{anibndID.Substring(0, 4)}0.anibnd.dcx"))
@@ -941,7 +943,7 @@ namespace DSAnimStudio
                             anibnd = ReadBinder(GameData.ReadFile($@"/chr/{overrideAnibndID}.anibnd.dcx"));
                         }
 
-                        chr = new Model(progress, chrbndID, chrbnd, 0, anibnd, texbnd,
+                        chr = new Model(progress, chrbndID, chrbnd, 0, anibnd, texbnd, behbnd,
                             ignoreStaticTransforms: true, additionalTexbnd: extraTexbnd, 
                             modelToImportDuringLoad: modelToImportDuringLoad, 
                             modelImportConfig: importConfig);

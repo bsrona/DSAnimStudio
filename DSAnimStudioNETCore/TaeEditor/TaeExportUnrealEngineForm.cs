@@ -29,6 +29,7 @@ namespace DSAnimStudio.TaeEditor
             ToolExportUnrealEngine.ExportFileType.AnimationSequence_Fbx,
             ToolExportUnrealEngine.ExportFileType.AnimationSequences_Fbx,
             ToolExportUnrealEngine.ExportFileType.Taes_Json,
+            ToolExportUnrealEngine.ExportFileType.Behavior_Json,
         };
 
         private bool IS_BUSY = false;

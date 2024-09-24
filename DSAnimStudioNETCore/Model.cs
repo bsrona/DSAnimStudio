@@ -114,6 +114,7 @@ namespace DSAnimStudio
         public IBinder binder;
         public FLVER2 flver;
         public string flverName;
+        public IBinder behaviorBinder;
 
         private int _selectedNpcParamIndex = -1;
         public int SelectedNpcParamIndex
@@ -311,7 +312,7 @@ namespace DSAnimStudio
         }
 
         public Model(IProgress<double> loadingProgress, string name, IBinder chrbnd, int modelIndex, 
-            IBinder anibnd, IBinder texbnd = null, List<string> additionalTpfNames = null, 
+            IBinder anibnd, IBinder texbnd = null, IBinder behbnd = null, List<string> additionalTpfNames = null, 
             string possibleLooseTpfFolder = null, int baseDmyPolyID = 0, 
             bool ignoreStaticTransforms = false, IBinder additionalTexbnd = null,
             SoulsAssetPipeline.FLVERImporting.FLVER2Importer.ImportedFLVER2Model modelToImportDuringLoad = null,
@@ -522,6 +523,16 @@ namespace DSAnimStudio
                     MainMesh.TextureReloadQueued = true;
                 });
             }
+
+			loadingProgress?.Report(3.3 / 4.0);
+
+			if (behbnd != null)
+			{
+				LoadingTaskMan.DoLoadingTaskSynchronous($"{Name}_BEHBND", $"Loading BEHBND for {Name}...", innerProg =>
+				{
+                    behaviorBinder = behbnd;
+				});
+			}
 
             loadingProgress?.Report(3.5 / 4.0);
 
@@ -881,8 +892,11 @@ namespace DSAnimStudio
 			if (!DBG.GetCategoryEnableNameDraw(DebugPrimitives.DbgPrimCategory.Ragdoll))
 				return;
 
-			List<IDbgPrim> primitives = new List<IDbgPrim>(RagdollBodies);
-            primitives.AddRange(RagdollConstraints);
+			List<IDbgPrim> primitives = new List<IDbgPrim>();
+            if (RagdollBodies != null)
+			    primitives.AddRange(RagdollBodies);
+            if (RagdollConstraints != null)
+                primitives.AddRange(RagdollConstraints);
             for (int i = 0; i < primitives.Count; ++i)
             {
                 var p = primitives[i];

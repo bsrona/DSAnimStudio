@@ -1171,7 +1171,7 @@ namespace DSAnimStudio.TaeEditor
                 ExportAllAnimsMenu?.Close();
                 ExportAllAnimsMenu = null;
             }));
-            SelectedTaeAnim = SelectedTae.Animations[0];
+            SelectedTaeAnim = SelectedTae.Animations.Count > 0 ? SelectedTae.Animations[0] : null;
             AnimationListScreen = new TaeEditAnimList(this);
 
             
@@ -1186,7 +1186,7 @@ namespace DSAnimStudio.TaeEditor
             //    TaeInterop.OnLoadANIBND(MenuBar, progress);
             //}
             CheckAutoLoadXMLTemplate();
-            SelectNewAnimRef(SelectedTae, SelectedTae.Animations[0]);
+            SelectNewAnimRef(SelectedTae, SelectedTaeAnim);
             LastFindInfo = null;
         }
 
@@ -2428,9 +2428,10 @@ namespace DSAnimStudio.TaeEditor
         {
             Graph.EventBoxes = Graph.EventBoxes.OrderBy(evBox => evBox.MyEvent.StartTime + (evBox.Row * 1000)).ToList();
 
-            SelectedTaeAnim.Events = Graph.EventBoxes
-                .Select(evBox => evBox.MyEvent)
-                .ToList();
+            if (SelectedTaeAnim != null)
+				SelectedTaeAnim.Events = Graph.EventBoxes
+					.Select(evBox => evBox.MyEvent)
+					.ToList();
 
             Graph?.GenerateFakeDS3EventGroups(threadLock: true);
         }
