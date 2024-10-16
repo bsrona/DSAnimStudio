@@ -930,7 +930,7 @@ namespace DSAnimStudio.TaeEditor
                         },
                         SimulationFrameChangePreBoxesAction =  (entry, evBoxes, time) =>
                         {
-                            if (Graph.ViewportInteractor.CurrentComboIndex < 0)
+                            if ((Graph.ViewportInteractor?.CurrentComboIndex ?? -1) < 0)
                                 return;
 
                             void doAnimContainer(NewAnimationContainer animContainer)

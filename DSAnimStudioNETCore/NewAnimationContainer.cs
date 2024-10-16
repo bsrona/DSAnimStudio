@@ -867,12 +867,16 @@ namespace DSAnimStudio
 
                             var frame = animLayersCopy_Base[i].GetBlendableTransformOnCurrentFrame(t);
 
-                            if (animLayersCopy_Base[i].IsAdditiveBlend)
+                            if (animLayersCopy_Base[i].data.BlendHint == HKX.AnimationBlendHint.ADDITIVE)
                             {
                                 frame = Skeleton.HkxSkeleton[t].RelativeReferenceTransform * frame;
                             }
+							else if(animLayersCopy_Base[i].data.BlendHint == HKX.AnimationBlendHint.ADDITIVE_DEPRECATED)
+							{
+								frame = frame * Skeleton.HkxSkeleton[t].RelativeReferenceTransform;
+							}
 
-                            weight += animLayersCopy_Base[i].Weight;
+							weight += animLayersCopy_Base[i].Weight;
                             if (animLayersCopy_Base.Count > 1)
                                 tr = NewBlendableTransform.Lerp(tr, frame, animLayersCopy_Base[i].Weight / weight);
                             else
@@ -901,12 +905,16 @@ namespace DSAnimStudio
 
                                 var frame = animLayersCopy_UpperBody[i].GetBlendableTransformOnCurrentFrame(t);
 
-                                if (animLayersCopy_UpperBody[i].IsAdditiveBlend)
-                                {
-                                    frame = Skeleton.HkxSkeleton[t].RelativeReferenceTransform * frame;
-                                }
+								if (animLayersCopy_UpperBody[i].data.BlendHint == HKX.AnimationBlendHint.ADDITIVE)
+								{
+									frame = Skeleton.HkxSkeleton[t].RelativeReferenceTransform * frame;
+								}
+								else if (animLayersCopy_UpperBody[i].data.BlendHint == HKX.AnimationBlendHint.ADDITIVE_DEPRECATED)
+								{
+									frame = frame * Skeleton.HkxSkeleton[t].RelativeReferenceTransform;
+								}
 
-                                weight += animLayersCopy_UpperBody[i].Weight;
+								weight += animLayersCopy_UpperBody[i].Weight;
                                 if (animLayersCopy_UpperBody.Count > 1)
                                     tr = NewBlendableTransform.Lerp(tr, frame, animLayersCopy_UpperBody[i].Weight / weight);
                                 else
@@ -950,8 +958,13 @@ namespace DSAnimStudio
                     foreach (var overlay in _additiveBlendOverlays)
                     {
                         if (overlay.Value.Weight > 0)
-                            currentMatrix *= NewBlendableTransform.Lerp(NewBlendableTransform.Identity, overlay.Value.GetBlendableTransformOnCurrentFrame(i) * NewBlendableTransform.Invert(overlay.Value.data.GetTransformOnFrameByBone(i, 0, false)), overlay.Value.Weight).GetMatrix().ToXna();
-                    }
+                        {
+                            if (overlay.Value.BlendHint == HKX.AnimationBlendHint.ADDITIVE_DEPRECATED)
+    							currentMatrix *= NewBlendableTransform.Lerp(NewBlendableTransform.Identity, overlay.Value.GetBlendableTransformOnCurrentFrame(i), overlay.Value.Weight).GetMatrix().ToXna();
+                            else
+                                currentMatrix = NewBlendableTransform.Lerp(NewBlendableTransform.Identity, overlay.Value.GetBlendableTransformOnCurrentFrame(i), overlay.Value.Weight).GetMatrix().ToXna() * currentMatrix;
+						}
+					}
                 }
 
                 currentMatrix *= parentTransformation;

@@ -152,6 +152,36 @@ namespace Behavior
 			bind.VariableType = hkBind.m_variableType;
 			bind.Flags = hkBind.m_flags;
 
+			if(bind.BitIndex > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if(bind.OffsetInObjectPlusOne > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if(bind.OffsetInArrayPlusOne > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if(bind.RootVariableIndex > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if(bind.Flags != 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if(bind.VariableType > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
 			return bind;
 		}
 	}
@@ -183,6 +213,22 @@ namespace Behavior
 			binds.IndexOfBindingToEnable = hkBinds.m_indexOfBindingToEnable;
 			binds.HasOutputBinding = hkBinds.m_hasOutputBinding;
 			binds.InitializedOffsets = hkBinds.m_initializedOffsets;
+
+			if (binds.IndexOfBindingToEnable > 0)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if (binds.HasOutputBinding)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
+			if (binds.InitializedOffsets)
+			{
+				int fuck = 0;
+				int fuck1 = fuck;
+			}
 			return binds;
 		}
 	}
@@ -436,7 +482,9 @@ namespace Behavior
 		public class State : Bindable
 		{
 			public string Name;
+			public int StateId;
 			public Generator Generator;
+			public TransitionList Transitions;
 
 			static State()
 			{
@@ -449,18 +497,89 @@ namespace Behavior
 
 				var hkState = hkBindable as hkbStateMachineStateInfo;
 
+				TransitionList transitions = new TransitionList();
+				transitions.From(hkState.m_transitions);
+
 				Name = hkState.m_name;
+				StateId = hkState.m_stateId;
 				Generator = Generator.Create(hkState.m_generator);
+				Transitions = transitions;
 			}
 		}
 
 		public class Transition
 		{
-				
+			//public hkbStateMachineTimeInterval m_triggerInterval;
+			//public hkbStateMachineTimeInterval m_initiateInterval;
+			//public hkbTransitionEffect m_transition;
+			//public hkbCondition m_condition;
+			public int EventId;
+			public int ToStateId;
+			public int FromNestedStateId;
+			public int ToNestedStateId;
+			public short Priority;
+			public short Flags;
+
+			public void From(hkbStateMachineTransitionInfo hkTransition)
+			{
+				EventId = hkTransition.m_eventId;
+				ToStateId = hkTransition.m_toStateId;
+				FromNestedStateId = hkTransition.m_fromNestedStateId;
+				ToNestedStateId = hkTransition.m_toNestedStateId;
+				Priority = hkTransition.m_priority;
+				Flags = hkTransition.m_flags;
+
+				if ((hkTransition.m_flags & (int)TransitionFlags.FLAG_FROM_NESTED_STATE_ID_IS_VALID) != 0
+					|| (hkTransition.m_flags & (int)TransitionFlags.FLAG_TO_NESTED_STATE_ID_IS_VALID) != 0)
+				{
+					Flags = hkTransition.m_flags;
+				}
+
+				if (hkTransition.m_condition != null)
+				{
+					Flags = hkTransition.m_flags;
+				}
+			}
+		}
+
+		public class TransitionList
+		{
+			//public hkbStateMachineTimeInterval m_triggerInterval;
+			//public hkbStateMachineTimeInterval m_initiateInterval;
+			//public hkbTransitionEffect m_transition;
+			//public hkbCondition m_condition;
+			public List<Transition> Transitions = new List<Transition>();
+
+			public bool HasEventlessTransitions;
+			public bool HasTimeBoundedTransitions;
+
+			public void From(hkbStateMachineTransitionInfoArray hkTransitionList)
+			{
+				if (hkTransitionList == null)
+					return;
+
+				List<Transition> transitions = new List<Transition>();
+
+				List<hkbStateMachineTransitionInfo> hkTransitions = hkTransitionList.m_transitions;
+				for (int i = 0; i < hkTransitions.Count; ++i)
+				{
+					hkbStateMachineTransitionInfo hkTransition = hkTransitions[i];
+					Transition transition = new Transition();
+					transition.From(hkTransition);
+					transitions.Add(transition);
+				}
+
+				Transitions = transitions;
+				HasEventlessTransitions = hkTransitionList.m_hasEventlessTransitions;
+				HasTimeBoundedTransitions = hkTransitionList.m_hasTimeBoundedTransitions;
+			}
 		}
 
 		public List<State> States = new List<State>();
-		public List<Transition> Transitions = new List<Transition>();
+		public TransitionList WildcardTransitions = new TransitionList();
+
+		public StartStateMode StartStateMode;
+		public int StartStateID;
 
 		static StateMachine()
 		{
@@ -474,8 +593,14 @@ namespace Behavior
 			hkbStateMachine hkStateMachine = hkBindable as hkbStateMachine;
 
 			List<State> states = Creates<hkbStateMachineStateInfo, State>(hkStateMachine.m_states);
+			TransitionList transitions = new TransitionList();
+			transitions.From(hkStateMachine.m_wildcardTransitions);
 
 			States = states;
+			WildcardTransitions = transitions;
+
+			StartStateMode = hkStateMachine.m_startStateMode;
+			StartStateID = hkStateMachine.m_startStateId;
 		}
 	}
 
@@ -551,6 +676,7 @@ namespace Behavior
 		public class Child : Bindable
 		{
 			public Generator Generator;
+			public float Weight;
 
 			static Child()
 			{
@@ -564,10 +690,13 @@ namespace Behavior
 				var hkChild = hkBindable as hkbBlenderGeneratorChild;
 
 				Generator = Generator.Create(hkChild.m_generator);
+				Weight = hkChild.m_weight;
 			}
 		}
 
 		public List<Child> Children;
+		public float ReferencePoseWeightThreshold;
+		public float BlendParameter;
 
 		static BlenderGenerator()
 		{
@@ -580,9 +709,29 @@ namespace Behavior
 
 			var hkGenerator = hkBindable as hkbBlenderGenerator;
 
+			if (hkGenerator.m_flags != 0)
+			{
+				int flags = hkGenerator.m_flags;
+				int flags1 = flags;
+			}
+
+			if (hkGenerator.m_doSubtractiveBlend)
+			{
+				bool subtractive = hkGenerator.m_doSubtractiveBlend;
+				subtractive = hkGenerator.m_subtractLastChild;
+			}
+
+			if (hkGenerator.m_subtractLastChild)
+			{
+				bool subtractive = hkGenerator.m_doSubtractiveBlend;
+				subtractive = hkGenerator.m_subtractLastChild;
+			}
+
 			List<Child> children = Creates<hkbBlenderGeneratorChild, Child>(hkGenerator.m_children);
 
 			Children = children;
+			ReferencePoseWeightThreshold = hkGenerator.m_referencePoseWeightThreshold;
+			BlendParameter = hkGenerator.m_blendParameter;
 		}
 	}
 
@@ -611,6 +760,13 @@ namespace Behavior
 	{
 		public Generator Generator;
 
+		public string OnActivateScript;
+		public string OnPreUpdateScript;
+		public string OnGenerateScript;
+		public string OnHandleEventScript;
+		public string OnDeactivateScript;
+
+
 		static ScriptGenerator()
 		{
 			Register<hkbScriptGenerator, ScriptGenerator>();
@@ -623,6 +779,12 @@ namespace Behavior
 			var hkGenerator = hkBindable as hkbScriptGenerator;
 
 			Generator = Create(hkGenerator.m_child);
+
+			OnActivateScript = hkGenerator.m_onActivateScript;
+			OnPreUpdateScript = hkGenerator.m_onPreUpdateScript;
+			OnGenerateScript = hkGenerator.m_onGenerateScript;
+			OnHandleEventScript = hkGenerator.m_onHandleEventScript;
+			OnDeactivateScript = hkGenerator.m_onDeactivateScript;
 		}
 	}
 
@@ -832,6 +994,7 @@ namespace DSAnimStudio
 			public string Skeleton;
 			public string PhysicsAsset;
 			public List<string> Animations;
+			public List<string> AdditiveAnimations;
 			public List<string> Taes;
 			public List<string> Behaviors;
 			public List<string> Materials;
@@ -975,6 +1138,7 @@ namespace DSAnimStudio
 		public struct Action
 		{
 			public long ID;
+			public string Name;
 			public List<Event> Events;
 			public List<EventGroup> EventGroups;
 			public AnimMiniHeader MiniHeader;
@@ -994,31 +1158,31 @@ namespace DSAnimStudio
 		}
 
 		public void Export(ExportFileType fileType, string path, string filename, out bool userRequestCancel)
-        {
+		{
 			bool requestCancel = false;
-            try
-            {
-                if (fileType == ExportFileType.All)
-                {
-                    ExportAll(path);
-                }
+			try
+			{
+				if (fileType == ExportFileType.All)
+				{
+					ExportAll(path);
+				}
 				else if (fileType == ExportFileType.SkeletalMesh_Fbx)
 				{
 					ExportSkeletalMeshes(path);
 				}
-				else if(fileType == ExportFileType.PhysicsAsset_Json)
+				else if (fileType == ExportFileType.PhysicsAsset_Json)
 				{
 					ExportPhysicsAssets(path);
 				}
-				else if(fileType == ExportFileType.Materials_Json)
+				else if (fileType == ExportFileType.Materials_Json)
 				{
 					ExportMaterials(path);
 				}
-				else if(fileType == ExportFileType.Mtds_Json)
+				else if (fileType == ExportFileType.Mtds_Json)
 				{
 					ExportMtds(path);
 				}
-				else if(fileType == ExportFileType.Textures)
+				else if (fileType == ExportFileType.Textures)
 				{
 					ExportTextures(path);
 				}
@@ -1029,7 +1193,7 @@ namespace DSAnimStudio
 				else if (fileType == ExportFileType.AnimationSequence_Fbx)
 				{
 					NewAnimationContainer animContainer = Scene.MainModel.AnimContainer;
-					ExportAnimation(animContainer, animContainer.CurrentAnimationName, path);
+					ExportAnimation(animContainer, animContainer.CurrentAnimationName, Path.ChangeExtension($"{path}\\{animContainer.CurrentAnimationName}", "fbx"));
 				}
 				else if (fileType == ExportFileType.AnimationSequences_Fbx)
 				{
@@ -1045,13 +1209,13 @@ namespace DSAnimStudio
 				}
 			}
 			catch (Exception ex)
-            {
-                var dlgRes = System.Windows.Forms.MessageBox.Show($"Failed to export file '{path}'.\nWould you like to continue anyways?\n\n\nError shown below:\n\n{ex}",
-                    "Continue With Errors?", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Warning);
-                requestCancel = (dlgRes == System.Windows.Forms.DialogResult.No);
-            }
-            userRequestCancel = requestCancel;
-        }
+			{
+				var dlgRes = System.Windows.Forms.MessageBox.Show($"Failed to export file '{path}'.\nWould you like to continue anyways?\n\n\nError shown below:\n\n{ex}",
+					"Continue With Errors?", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Warning);
+				requestCancel = (dlgRes == System.Windows.Forms.DialogResult.No);
+			}
+			userRequestCancel = requestCancel;
+		}
 
 		public void ExportAll(string path)
 		{
@@ -1068,7 +1232,8 @@ namespace DSAnimStudio
 				partFile.Materials = ExportMaterials(path, part);
 				partFile.Skeleton = ExportSkeleton(path, part);
 				partFile.PhysicsAsset = ExportPhysicsAsset(path, part);
-				partFile.Animations = ExportAnimations(path, part);
+				partFile.Animations = ExportAnimations(path, part, false);
+				partFile.AdditiveAnimations = ExportAnimations(path, part, true);
 				partFile.Taes = ExportTaes(path, part);
 				partFile.Behaviors = ExportBehaviors(path, part);
 				partFile.Mesh = ExportSkeletalMesh(path, part);
@@ -1095,7 +1260,7 @@ namespace DSAnimStudio
 		{
 			List<Part> parts = GetParts();
 
-			for(int i = 0; i < parts.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
 				Part part = parts[i];
 
@@ -1107,7 +1272,7 @@ namespace DSAnimStudio
 		{
 			List<Part> parts = GetParts();
 
-			for(int i = 0; i < parts.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
 				Part part = parts[i];
 
@@ -1119,7 +1284,7 @@ namespace DSAnimStudio
 		{
 			List<Part> parts = GetParts();
 
-			for(int i = 0; i < parts.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
 				Part part = parts[i];
 
@@ -1135,7 +1300,8 @@ namespace DSAnimStudio
 			{
 				Part part = parts[i];
 
-				ExportAnimations(path, part);
+				ExportAnimations(path, part, false);
+				ExportAnimations(path, part, true);
 			}
 		}
 
@@ -1143,7 +1309,7 @@ namespace DSAnimStudio
 		{
 			List<Part> parts = GetParts();
 
-			for(int i = 0; i < parts.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
 				Part part = parts[i];
 
@@ -1166,7 +1332,7 @@ namespace DSAnimStudio
 		{
 			List<Part> parts = GetParts();
 
-			for(int i = 0; i < parts.Count; ++i)
+			for (int i = 0; i < parts.Count; ++i)
 			{
 				Part part = parts[i];
 				ExportMtds(path, part);
@@ -1185,7 +1351,7 @@ namespace DSAnimStudio
 		}
 
 		public string ExportSkeletalMesh(string path, Part part)
-        {
+		{
 			FLVER2 flver = part.flver;
 			string flverPath = part.flverPath;
 
@@ -1200,15 +1366,15 @@ namespace DSAnimStudio
 
 			CreateDirectory(fullPath);
 
-            using(var context = new AssimpContext())
-            {
+			using (var context = new AssimpContext())
+			{
 				Assimp.Scene scene = CreateScene(flver, relativeToRoot);
 				if (context.ExportFile(scene, fullPath, ExportFormatID))
 					return relativePath;
 				else
 					return null;
-            }
-        }
+			}
+		}
 
 		public string ExportPhysicsAsset(string path, Part part)
 		{
@@ -1288,6 +1454,9 @@ namespace DSAnimStudio
 						}
 					}
 
+					string name = mainChrSolver.GetHKXNameIgnoreReferences(tae, taeAnimation);
+					name = Path.GetFileNameWithoutExtension(name);
+
 					string animationFile = null;
 
 					string animationName = mainChrSolver.GetHKXName(tae, taeAnimation);
@@ -1334,11 +1503,12 @@ namespace DSAnimStudio
 						e.Events = taeEventGroup.indices;
 
 						eventGroups.Add(e);
-					}					
+					}
 
 					Action action = new Action();
 
 					action.ID = taeAnimation.ID;
+					action.Name = name;
 					action.MiniHeader = taeAnimation.MiniHeader;
 					action.FileName = taeAnimation.AnimFileName;
 					action.Reference = reference;
@@ -1410,7 +1580,7 @@ namespace DSAnimStudio
 			string fullpath = path + relativePath;
 			CreateDirectory(fullpath);
 
-			using(var context = new AssimpContext())
+			using (var context = new AssimpContext())
 			{
 				Assimp.Scene scene = CreateScene(animationContainer);
 				if (context.ExportFile(scene, fullpath, ExportFormatID))
@@ -1420,7 +1590,7 @@ namespace DSAnimStudio
 			}
 		}
 
-		public List<string> ExportAnimations(string path, Part part)
+		public List<string> ExportAnimations(string path, Part part, bool isAdditive)
 		{
 			List<string> animations = new List<string>();
 
@@ -1438,7 +1608,7 @@ namespace DSAnimStudio
 				IBinder binder = binders[j];
 				if (binder == null)
 					continue;
-	
+
 				for (int k = 0; k < binder.Files.Count; ++k)
 				{
 					BinderFile file = binder.Files[k];
@@ -1454,10 +1624,17 @@ namespace DSAnimStudio
 
 					try
 					{
+						NewHavokAnimation hkAnimation = animationContainer.FindAnimation(filename);
+						if (hkAnimation == null)
+							continue;
+
+						if (isAdditive != hkAnimation.IsAdditiveBlend)
+							continue;
+
 						if (ExportAnimation(animationContainer, filename, fullPath))
 							animations.Add(relativePath);
 					}
-					catch (Exception ex) 
+					catch (Exception ex)
 					{
 						ErrorLog.LogWarning($"Unable to export {fullPath}. exception: {ex.Message}");
 					}
@@ -1531,7 +1708,7 @@ namespace DSAnimStudio
 
 			FLVER2 flver = part.flver;
 			List<string> filePaths = GetReferenceTexturePaths(flver);
-			for(int i = 0; i < filePaths.Count; ++i)
+			for (int i = 0; i < filePaths.Count; ++i)
 			{
 				string filePath = filePaths[i];
 				string relativePath = ToRelativePath(filePath);
@@ -1700,7 +1877,7 @@ namespace DSAnimStudio
 
 		public bool ExportAnimationFBX(NewAnimationContainer animContainer, string name, string path)
 		{
-			using(var context = new AssimpContext())
+			using (var context = new AssimpContext())
 			{
 				Assimp.Scene scene = CreateScene(animContainer, name);
 				//Assimp.Scene scene = CreateTestScene();
@@ -1730,7 +1907,7 @@ namespace DSAnimStudio
 				System.Numerics.Vector4[] rootMotionFrames = rootMotionData.Frames;
 
 				string rootMotion = $"RootMotion({rootMotionData.Duration}{rootMotionData.Up.ToString()}{rootMotionData.Forward.ToString()})";
-				for(int frameIndex = 0; frameIndex < rootMotionFrames.Length; ++frameIndex)
+				for (int frameIndex = 0; frameIndex < rootMotionFrames.Length; ++frameIndex)
 				{
 					var frame = rootMotionFrames[frameIndex];
 
@@ -1740,7 +1917,7 @@ namespace DSAnimStudio
 
 				writer.WriteLine(rootMotion);
 
-				for(int hkxBoneIndex = 0; hkxBoneIndex < hkxBoneInfos.Count; ++hkxBoneIndex)
+				for (int hkxBoneIndex = 0; hkxBoneIndex < hkxBoneInfos.Count; ++hkxBoneIndex)
 				{
 					HkxBoneInfo hkxBoneInfo = hkxBoneInfos[hkxBoneIndex];
 					string hkxBoneName = hkxBoneInfo.Name;
@@ -1794,14 +1971,14 @@ namespace DSAnimStudio
 				for (int i = 0; i < count; ++i)
 				{
 					byte gray = data[i];
-					
+
 					for (int j = 0; j < 3; ++j)
 						rgbData[i * 4 + j] = gray;
 					rgbData[i * 4 + 3] = 0xFF;
 				}
 				data = rgbData;
 			}
-		
+
 			imagef = imageFormat;
 			pf = pixelFormat;
 
@@ -1832,7 +2009,7 @@ namespace DSAnimStudio
 						bitmap.Save(exportPath, imageFormat);
 						return true;
 					}
-					catch(Exception e)
+					catch (Exception e)
 					{
 						return false;
 					}
@@ -1945,7 +2122,7 @@ namespace DSAnimStudio
 
 			int count = (int)bones.Size;
 			List<Assimp.Node> nodes = new List<Assimp.Node>(count);
-			for(int i = 0; i < count; ++i)
+			for (int i = 0; i < count; ++i)
 			{
 				HKX.Bone bone = bones[i];
 				HKX.Transform transform = transforms[i];
@@ -2076,7 +2253,7 @@ namespace DSAnimStudio
 
 					if (isTransparentMaterial && type == Assimp.TextureType.Diffuse)
 					{
-						isTransparent = IsHasAlpha(path);						
+						isTransparent = IsHasAlpha(path);
 						path = relativeToRoot + ToRelativePath(ToTexturePath(path, false, isTransparent));
 					}
 					else
@@ -2178,7 +2355,7 @@ namespace DSAnimStudio
 			List<Color4D>[] colors = new List<Color4D>[colorCount].Select(e => new List<Color4D>(vertexCount)).ToArray();
 			List<Vector3D>[] uvs = new List<Vector3D>[uvCount].Select(e => new List<Vector3D>(vertexCount)).ToArray();
 
-			for(int i = 0; i < vertices.Count; ++i)
+			for (int i = 0; i < vertices.Count; ++i)
 			{
 				FLVER.Vertex vertex = vertices[i];
 
@@ -2353,6 +2530,20 @@ namespace DSAnimStudio
 			for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
 			{
 				NewBlendableTransform frame = havokAnimationData.GetTransformOnFrameByBone(hkxBoneIndex, frameIndex, false);
+				if (havokAnimationData.IsAdditiveBlend)
+				{
+					var skeleTransform = havokAnimationData.hkaSkeleton.Transforms[hkxBoneIndex];
+
+					NewBlendableTransform referencePos = NewBlendableTransform.FromHKXTransform(skeleTransform);
+
+					System.Numerics.Matrix4x4 transform;
+					if (havokAnimationData.BlendHint == HKX.AnimationBlendHint.ADDITIVE_DEPRECATED)
+						transform = referencePos.GetMatrixScale() * referencePos.GetMatrix() * frame.GetMatrixScale() * frame.GetMatrix();
+					else
+						transform = frame.GetMatrixScale() * frame.GetMatrix() * referencePos.GetMatrixScale() * referencePos.GetMatrix();
+
+					System.Numerics.Matrix4x4.Decompose(transform, out frame.Scale, out frame.Rotation, out frame.Translation);
+				}
 
 				Vector3D translate = From(frame.Translation) * Mirror * UnitScale;
 				Assimp.Quaternion rotation = From(frame.Rotation);
@@ -2571,20 +2762,20 @@ namespace DSAnimStudio
 				if (constraintInfo == null)
 					continue;
 
-                int bodyAIndex = (int)(constraintInfo.m_bodyA.m_serialAndIndex & 0x00FFFFFF);
+				int bodyAIndex = (int)(constraintInfo.m_bodyA.m_serialAndIndex & 0x00FFFFFF);
 				int bodyBIndex = (int)(constraintInfo.m_bodyB.m_serialAndIndex & 0x00FFFFFF);
 
 				int ragdollBoneAIndex = boneToBodyMap.Find(e => e == bodyAIndex);
-                if (ragdollBoneAIndex < 0)
-                    continue;
+				if (ragdollBoneAIndex < 0)
+					continue;
 
 				int ragdollBoneBIndex = boneToBodyMap.Find(e => e == bodyBIndex);
-				if(ragdollBoneBIndex < 0)
+				if (ragdollBoneBIndex < 0)
 					continue;
 
 				int mapAIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneAIndex);
-                if (mapAIndex < 0)
-                    continue;
+				if (mapAIndex < 0)
+					continue;
 
 				int mapBIndex = simpleMapping.FindIndex(e => e.m_boneB == ragdollBoneBIndex);
 				if (mapBIndex < 0)
@@ -2596,10 +2787,10 @@ namespace DSAnimStudio
 				string boneAName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneAIndex].m_name;
 				string boneBName = skeletonMapper.m_mapping.m_skeletonA.m_bones[referenceBoneBIndex].m_name;
 
-                Matrix poseAMatrix = poseMatrices[ragdollBoneAIndex];
-                Matrix poseBMatrix = poseMatrices[ragdollBoneBIndex];
+				Matrix poseAMatrix = poseMatrices[ragdollBoneAIndex];
+				Matrix poseBMatrix = poseMatrices[ragdollBoneBIndex];
 
-                hknpBodyCinfo bodyAInfo = bodyInfos[bodyAIndex];
+				hknpBodyCinfo bodyAInfo = bodyInfos[bodyAIndex];
 				hknpBodyCinfo bodyBInfo = bodyInfos[bodyBIndex];
 
 				Constraint constraint = CreateConstraint(constraintInfo, bodyAInfo, bodyBInfo, boneAName, boneBName, poseAMatrix, poseBMatrix);
@@ -2693,7 +2884,7 @@ namespace DSAnimStudio
 				}
 
 				System.Numerics.Quaternion mirror = System.Numerics.Quaternion.CreateFromAxisAngle(To(Vector3.UnitX), MathF.PI);
-				
+
 				Capsule capsule = new Capsule();
 
 				capsule.Center = To(Vector3.Transform(center, mirror)) * To(UnitScale);
@@ -2760,14 +2951,14 @@ namespace DSAnimStudio
 			if (transforms == null)
 			{
 				limitedHingeConstraintData = constraintInfo.m_constraintData as hkpLimitedHingeConstraintData;
-				if(limitedHingeConstraintData != null)
+				if (limitedHingeConstraintData != null)
 				{
 					transforms = limitedHingeConstraintData.m_atoms.m_transforms;
 				}
 			}
 
 			if (transforms != null)
-            {
+			{
 				Matrix objectATransform = Matrix.CreateFromQuaternion(Microsoft.Xna.Framework.Quaternion.Normalize(new Microsoft.Xna.Framework.Quaternion(
 						bodyAInfo.m_orientation.X,
 						bodyAInfo.m_orientation.Y,
@@ -2894,7 +3085,7 @@ namespace DSAnimStudio
 
 			constraint.PriAxis1 = To(Vector3.Transform(axisXA, mirror));
 			constraint.PriAxis2 = To(Vector3.Transform(axisXB, mirror));
-											 
+
 			constraint.SecAxis1 = To(Vector3.Transform(axisYA, mirror));
 			constraint.SecAxis2 = To(Vector3.Transform(axisYB, mirror));
 
@@ -2934,15 +3125,15 @@ namespace DSAnimStudio
 		}
 
 		public Assimp.Scene CreateTestScene()
-        {
-            using(var context = new AssimpContext())
-            {
+		{
+			using (var context = new AssimpContext())
+			{
 				Assimp.Scene testScene = context.ImportFile("C:\\Users\\chypy\\Documents\\3dsMax\\export\\test.FBX");
 				List<Mesh> testMeshes = testScene.Meshes;
 				Assimp.Node rootNode = testScene.RootNode;
 				return testScene;
 			}
-			
+
 
 			List<Vector3D> vertices = new List<Vector3D>()
 			{
@@ -2968,7 +3159,7 @@ namespace DSAnimStudio
 			};
 
 			List<Face> faces = new List<Face>();
-			for(int i = 0; i < (indices.Count / 3); i++)
+			for (int i = 0; i < (indices.Count / 3); i++)
 			{
 				Face face = new Face();
 				face.Indices.Add(indices[i * 3]);
@@ -3113,7 +3304,7 @@ namespace DSAnimStudio
 
 		bool IsHasAlpha(byte[] ddsBytes)
 		{
-  			using (MemoryStream stream = new MemoryStream(ddsBytes))
+			using (MemoryStream stream = new MemoryStream(ddsBytes))
 			{
 				using (var image = Pfimage.FromStream(stream))
 				{
@@ -3189,7 +3380,7 @@ namespace DSAnimStudio
 					texturePaths.Add(filePath);
 
 				string defaultPath = ToTexturePath(samplerConfig.DefaultTexPath);
-				if(!string.IsNullOrEmpty(defaultPath) && !texturePaths.Contains(defaultPath))
+				if (!string.IsNullOrEmpty(defaultPath) && !texturePaths.Contains(defaultPath))
 					texturePaths.Add(defaultPath);
 			}
 		}
@@ -3218,7 +3409,7 @@ namespace DSAnimStudio
 
 			string formatName = paramName.ToUpper();
 			List<string> keys = paramTypeDic.Keys.ToList();
-			int index = keys.FindIndex( e => formatName.Contains(e));
+			int index = keys.FindIndex(e => formatName.Contains(e));
 			if (index >= 0)
 			{
 				string key = keys[index];
@@ -3319,7 +3510,7 @@ namespace DSAnimStudio
 		BoundingBox CalculateAABB(List<Assimp.Node> boneNodes)
 		{
 			List<Vector3> positions = new List<Vector3>(boneNodes.Count);
-			
+
 			for (int i = 0; i < boneNodes.Count; ++i)
 			{
 				Assimp.Node node = boneNodes[i];
@@ -3497,13 +3688,13 @@ namespace DSAnimStudio
 
 		string ToTexturePath(string path, bool isCheckTransparent = true, bool isTransparent = false)
 		{
-			if(string.IsNullOrEmpty(path))
+			if (string.IsNullOrEmpty(path))
 				return path;
 
 			string extension = Path.GetExtension(path);
-			if(extension.ToLower().Contains("tif"))
+			if (extension.ToLower().Contains("tif"))
 			{
-				if((isCheckTransparent && IsHasAlpha(path)) || (!isCheckTransparent && isTransparent))
+				if ((isCheckTransparent && IsHasAlpha(path)) || (!isCheckTransparent && isTransparent))
 					path = Path.ChangeExtension(path, ".bmp");
 			}
 
@@ -3517,19 +3708,19 @@ namespace DSAnimStudio
 		}
 
 		static Vector3 GetColumn(ref Matrix m, int index)
-        {
-            if (index == 1)
-            {
-                return new Vector3(m.M21, m.M22, m.M23);
-            }
+		{
+			if (index == 1)
+			{
+				return new Vector3(m.M21, m.M22, m.M23);
+			}
 			else if (index == 2)
 			{
 				return new Vector3(m.M31, m.M32, m.M33);
 			}
-            else
-            {
-                return new Vector3(m.M11, m.M12, m.M13);
-            }
+			else
+			{
+				return new Vector3(m.M11, m.M12, m.M13);
+			}
 		}
 
 		static float Unpack(hknpHalf v)
@@ -3568,7 +3759,7 @@ namespace DSAnimStudio
 			List<short> svalues = v;
 			List<int> ivalues = new List<int>(svalues.Count);
 
-			for(int i = 0; i < svalues.Count; ++i)
+			for (int i = 0; i < svalues.Count; ++i)
 			{
 				short svalue = svalues[i];
 				ivalues.Add(((int)svalue << 16) + hkPackedUnitVector_m_offset);

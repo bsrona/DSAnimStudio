@@ -327,6 +327,15 @@ namespace DSAnimStudio.ImguiOSD
                                     bool selected = overlay.Value.Weight >= 0;
                                     bool prevSelected = selected;
                                     ImGui.Selectable(overlay.Value.Name, ref selected);
+                                    if (ImGui.IsItemClicked())
+                                    {
+										NewHavokAnimation.AnimOverlayRequest animOverlayRequest = new NewHavokAnimation.AnimOverlayRequest();
+                                        animOverlayRequest.Weight = 1.0f;
+										Dictionary<int, NewHavokAnimation.AnimOverlayRequest> add = new Dictionary<int, NewHavokAnimation.AnimOverlayRequest>();
+                                        add[overlay.Key] = animOverlayRequest;
+										Scene.MainModel.AnimContainer.SetAdditiveLayers(add);
+									}
+
 
                                     if (selected)
                                     {
